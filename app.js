@@ -111,20 +111,25 @@ app.use('/api/v1/users', s3Router)
 // app.use('/api/v1/users', userRoutes)
 // app.use('/api/v1/users', newUserRoute);
 
-const port = process.env.PORT;
 
 app.get('/', (req, res) => {
     res.send('Hello World')
 });
 
 
-if (process.env.ENVIRONMENT === 'production') {
-    exports.handler = serverless(app);
-  } else {
-    app.listen(4000, () => {
-      console.log(`Server is listening on port 4000.`);
-    });
-  }
+// if (process.env.ENVIRONMENT === 'production') {
+//     exports.handler = serverless(app);
+//   } else {
+//     app.listen(4000, () => {
+//       console.log(`Server is listening on port 4000.`);
+//     });
+//   }
+
+// Start the server
+const port = process.env.PORT || 4000;
+app.listen(port, () => {
+    console.log(`Server is listening on port ${port}`);
+});
 
 app.use(middleware(therapistConnection).unknownEndpoint)
 // app.listen(port, ()=> {
