@@ -32,9 +32,6 @@ const express = require('express');
 const router = express.Router();
 const mongoController = require('../controllers/mongoController');
 
-
-// module.exports = router;
-
 router.post('/booking', async (req, res) => {
   const allowedOrigins = [
     'https://www.myempathyspace.com',
@@ -56,18 +53,26 @@ router.post('/booking', async (req, res) => {
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
-  res.header('Access-Control-Allow-Credentials', 'true'); // Allow credentials
+  res.header('Access-Control-Allow-Credentials', 'true');
 
-  const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate } = req.body;
-  const bookingDetails = {
-    firstName,
-    lastName,
-    email,
-    therapistName,
-    meetingType,
-    location,
-    appointmentDate,
-  };
-  const result = await mongoController.saveNewBooking(bookingDetails);
-  res.send(result);
+  try {
+    const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate } = req.body;
+    const bookingDetails = {
+      firstName,
+      lastName,
+      email,
+      therapistName,
+      meetingType,
+      location,
+      appointmentDate,
+    };
+    const result = await mongoController.saveNewBooking(bookingDetails);
+    res.json(result);
+  } catch (error) {
+    console.error('Error saving booking:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
+
+// ✅ Ensure this is uncommented
+module.exports = router;
