@@ -2,7 +2,7 @@ require('dotenv').config();
 const { WebClient } = require('@slack/web-api');
 
 // Initialize the WebClient with your Slack bot token
-const slackBotToken = 'xoxb-1727826119732-6544901763073-QVmGVfI8w7a3YS4VHpYsL3NQ';
+const slackBotToken = process.env.NEW_SLACK_BOT_TOKEN;
 const web = new WebClient(slackBotToken);
 
 // Function to send a Slack notification
