@@ -118,6 +118,8 @@ module.exports = (connection) => {
   // Get a promo code by its name
   promoCodeRouter.get('/promo_codes/by_name/:name', async (request, response) => {
     const { name } = request.params;
+
+    const date = new Date()
   
     try {
       const promoCode = await PromoCode.findOne({ code: name });
@@ -125,8 +127,14 @@ module.exports = (connection) => {
       if (!promoCode) {
         return response.status(404).json({ error: 'Promo Code not found' });
       }
+
+      if (promoCode.endDate < date) {
+        return response.status(404).json({ error: 'Promo Code has expired' });
+      }
   
-      response.json(promoCode);
+      response.status(200).json({ promoCode, message: 'Promo Code is valid' });
+
+      
     } catch (error) {
       console.error('Error fetching specific promo code:', error);
       response.status(500).json({ error: 'Internal server error' });
