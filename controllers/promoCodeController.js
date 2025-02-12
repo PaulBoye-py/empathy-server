@@ -125,14 +125,28 @@ module.exports = (connection) => {
       const promoCode = await PromoCode.findOne({ code: name });
   
       if (!promoCode) {
-        return response.status(404).json({ message: 'Promo Code not found', success: false });
+        return response.status(404).json({ 
+          message: 'Promo Code not found', 
+          type_ID: 'NotFound',
+          success: false 
+        });
       }
 
       if (promoCode.endDate < date) {
-        return response.status(404).json({ message: 'Promo Code has expired', success: false });
+        return response.status(404).json({ 
+          message: 'Promo Code has expired', 
+          type_ID: 'Expired',
+          success: false,
+          promoCode
+        });
       }
   
-      response.status(200).json({ promoCode, message: 'Promo Code is valid', success: true });
+      response.status(200).json({ 
+        promoCode, 
+        message: 'Promo Code is valid', 
+        success: true,
+        type_ID: 'success',
+      });
 
       
     } catch (error) {
