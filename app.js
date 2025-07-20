@@ -20,6 +20,11 @@ const userRoutes = require('./routes/userRoutes'); // Import user routes
 const newUserRoute = require('./routes/newUserRoute')
 const middleware = require('./middleware/middleware')
 const s3Router = require('./controllers/imageUpload');
+
+//Error Reporting
+const errorReportingRoutes = require('./routes/errorReporting');
+const paystackRoutes = require('./routes/paystack');
+const { errorReportingMiddleware } = require('./middleware/errorReporting');
 const { default: mongoose } = require('mongoose');
 
 
@@ -99,11 +104,12 @@ app.use('/api/v1/promo', promoCodeController(therapistConnection))
 
 app.use('/api/v1/booking', mongoRoutes);
 
-app.use('/api/v1/payment', paymentRoute);
+app.use('/api/v1/payment', paystackRoutes);
+app.use('/api/v1/errors', errorReportingRoutes);
 
 app.use('/api/v1/payment', flutterwaveRoute);
 
-app.use('/api/v1/slack', slackNotificationRoute);
+// app.use('/api/v1/slack', slackNotificationRoute);
 
 app.use('/api/v1/auth', authRoute(therapistConnection))
 app.use('/api/v1/users', newUserRoute(therapistConnection))
@@ -132,6 +138,7 @@ app.listen(port, () => {
 });
 
 app.use(middleware(therapistConnection).unknownEndpoint)
+app.use(errorReportingMiddleware);
 // app.listen(port, ()=> {
 //     console.log('Server is listening at port 4000')
 // })
