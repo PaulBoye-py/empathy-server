@@ -27,6 +27,9 @@ const paystackRoutes = require('./routes/paystack');
 const { errorReportingMiddleware } = require('./middleware/errorReporting');
 const { default: mongoose } = require('mongoose');
 
+// CRON
+const { schedulePaymentSummaryJob } = require('./jobs/paymentSummaryJob');
+
 
 const allowedOrigins = [
     process.env.FRONTENDURL,
@@ -136,6 +139,7 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
     console.log(`Server is listening on port ${port}`);
 });
+schedulePaymentSummaryJob();
 
 app.use(middleware(therapistConnection).unknownEndpoint)
 app.use(errorReportingMiddleware);

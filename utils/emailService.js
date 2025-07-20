@@ -167,7 +167,200 @@ const sendPaymentStatusNotification = async (paymentData, status, clientData = n
   }
 };
 
+const sendPaymentSummaryEmail = async (summary) => {
+  try {
+    const { timeRange, totals, amounts, details } = summary;
+    
+    const fromDate = new Date(timeRange.from).toLocaleString();
+    const toDate = new Date(timeRange.to).toLocaleString();
+    
+    const subject = `📊 Payment Summary Report - Last ${timeRange.hoursBack} Hours (${totals.totalTransactions} transactions)`;
+
+    // Calculate percentages
+    const successRate = totals.totalTransactions > 0 ? ((totals.successful / totals.totalTransactions) * 100).toFixed(1) : 0;
+    const failureRate = totals.totalTransactions > 0 ? ((totals.failed / totals.totalTransactions) * 100).toFixed(1) : 0;
+    const abandonRate = totals.totalTransactions > 0 ? ((totals.abandoned / totals.totalTransactions) * 100).toFixed(1) : 0;
+
+    // Helper function to format currency
+    const formatAmount = (amount) => `₦${(amount / 100).toLocaleString()}`;
+
+    // Generate payment tables
+    const generatePaymentTable = (payments, status) => {
+      if (payments.length === 0) {
+        return `<p style="color: #6c757d; font-style: italic;">No ${status} payments in this period.</p>`;
+      }
+
+      const statusColors = {
+        successful: '#28a745',
+        failed: '#dc3545',
+        abandoned: '#ffc107'
+      };
+
+      let table = `
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+          <thead>
+            <tr style="background-color: ${statusColors[status]}; color: white;">
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Customer</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Amount</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Therapist</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Type</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Date</th>
+              ${status === 'failed' ? '<th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Reason</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      payments.forEach(payment => {
+        table += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">
+              <strong>${payment.customer}</strong><br>
+              <small style="color: #6c757d;">${payment.email}</small>
+            </td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${formatAmount(payment.amount)}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${payment.therapist}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${payment.meetingType}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">
+              <small>${new Date(payment.date).toLocaleString()}</small>
+            </td>
+            ${status === 'failed' ? `<td style="padding: 8px; border: 1px solid #ddd;"><small>${payment.reason}</small></td>` : ''}
+          </tr>
+        `;
+      });
+
+      table += `
+          </tbody>
+        </table>
+      `;
+
+      return table;
+    };
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">📊 Payment Summary Report</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">
+            ${fromDate} - ${toDate} (${timeRange.hoursBack} hours)
+          </p>
+        </div>
+
+        <!-- Overview Cards -->
+        <div style="display: flex; gap: 15px; margin: 20px 0; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 150px; background: #d4edda; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3 style="margin: 0; color: #155724; font-size: 32px;">${totals.successful}</h3>
+            <p style="margin: 5px 0 0 0; color: #155724;">✅ Successful</p>
+            <small style="color: #28a745; font-weight: bold;">${successRate}%</small>
+          </div>
+          
+          <div style="flex: 1; min-width: 150px; background: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3 style="margin: 0; color: #721c24; font-size: 32px;">${totals.failed}</h3>
+            <p style="margin: 5px 0 0 0; color: #721c24;">❌ Failed</p>
+            <small style="color: #dc3545; font-weight: bold;">${failureRate}%</small>
+          </div>
+          
+          <div style="flex: 1; min-width: 150px; background: #fff3cd; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3 style="margin: 0; color: #856404; font-size: 32px;">${totals.abandoned}</h3>
+            <p style="margin: 5px 0 0 0; color: #856404;">⚠️ Abandoned</p>
+            <small style="color: #ffc107; font-weight: bold;">${abandonRate}%</small>
+          </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #495057; margin-top: 0;">💰 Financial Summary</h3>
+          <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+            <div>
+              <p><strong>Successful Revenue:</strong> <span style="color: #28a745; font-weight: bold;">${formatAmount(amounts.totalSuccessful)}</span></p>
+              <p><strong>Failed Amount:</strong> <span style="color: #dc3545;">${formatAmount(amounts.totalFailed)}</span></p>
+              <p><strong>Abandoned Amount:</strong> <span style="color: #ffc107;">${formatAmount(amounts.totalAbandoned)}</span></p>
+            </div>
+            <div>
+              <p><strong>Total Transactions:</strong> ${totals.totalTransactions}</p>
+              <p><strong>Success Rate:</strong> ${successRate}%</p>
+              <p><strong>Potential Lost Revenue:</strong> <span style="color: #dc3545;">${formatAmount(amounts.totalFailed + amounts.totalAbandoned)}</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Successful Payments -->
+        <div style="margin: 30px 0;">
+          <h3 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px;">
+            ✅ Successful Payments (${totals.successful})
+          </h3>
+          ${generatePaymentTable(details.successful, 'successful')}
+        </div>
+
+        <!-- Failed Payments -->
+        ${totals.failed > 0 ? `
+        <div style="margin: 30px 0;">
+          <h3 style="color: #dc3545; border-bottom: 2px solid #dc3545; padding-bottom: 10px;">
+            ❌ Failed Payments (${totals.failed}) - ACTION REQUIRED
+          </h3>
+          ${generatePaymentTable(details.failed, 'failed')}
+          <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24; margin-top: 0;">⚠️ Action Required</h4>
+            <p>These customers attempted to pay but failed. Consider reaching out to them:</p>
+            <ul style="color: #721c24;">
+              <li>Check if they need payment assistance</li>
+              <li>Verify their contact information</li>
+              <li>Offer alternative payment methods</li>
+              <li>Follow up with their selected therapists</li>
+            </ul>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Abandoned Payments -->
+        ${totals.abandoned > 0 ? `
+        <div style="margin: 30px 0;">
+          <h3 style="color: #ffc107; border-bottom: 2px solid #ffc107; padding-bottom: 10px;">
+            ⚠️ Abandoned Payments (${totals.abandoned})
+          </h3>
+          ${generatePaymentTable(details.abandoned, 'abandoned')}
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ffc107;">
+            <h4 style="color: #856404; margin-top: 0;">💡 Follow-up Suggestions</h4>
+            <p>These customers started the payment process but didn't complete it:</p>
+            <ul style="color: #856404;">
+              <li>Send follow-up emails with payment links</li>
+              <li>Check for technical issues in the payment flow</li>
+              <li>Offer customer support for payment completion</li>
+            </ul>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Footer -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 0 0 10px 10px; margin-top: 30px; text-align: center;">
+          <p style="margin: 0; color: #6c757d;">
+            <strong>Report generated:</strong> ${new Date().toLocaleString()}<br>
+            <small>This report is automatically generated every ${timeRange.hoursBack} hours</small>
+          </p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: process.env.ZOHO_EMAIL,
+      to: SUPPORT_EMAILS,
+      subject: subject,
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Payment summary email sent successfully (${totals.totalTransactions} transactions)`);
+    
+  } catch (error) {
+    console.error('❌ Failed to send payment summary email:', error);
+    throw error; // Re-throw so cron job can handle it
+  }
+};
+
+
 module.exports = {
   sendErrorNotification,
-  sendPaymentStatusNotification
+  sendPaymentStatusNotification,
+  sendPaymentSummaryEmail,
 };

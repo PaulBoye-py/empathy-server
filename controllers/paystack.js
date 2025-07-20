@@ -306,6 +306,165 @@ const monitorPaymentStatuses = async (req, res) => {
   }
 };
 
+const getPaymentsSummary = async (hoursBack = 12) => {
+  try {
+    const secretKey = process.env.ENVIRONMENT === 'production'
+      ? process.env.SECRET_KEY
+      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
+
+    // Calculate time range (last 12 hours)
+    const now = new Date();
+    const hoursAgo = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000));
+    
+    // Get payments from Paystack
+    const response = await axios.get('https://api.paystack.co/transaction', {
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+      },
+      params: {
+        perPage: 200, // Get more records to ensure we catch all in timeframe
+        from: hoursAgo.toISOString(),
+        to: now.toISOString()
+      }
+    });
+
+    const { data } = response.data;
+    
+    if (!data || !Array.isArray(data)) {
+      return {
+        success: false,
+        message: 'No payment data received',
+        summary: null
+      };
+    }
+
+    // Filter payments within the last X hours (additional client-side filtering)
+    const recentPayments = data.filter(payment => {
+      const paymentDate = new Date(payment.created_at);
+      return paymentDate >= hoursAgo && paymentDate <= now;
+    });
+
+    // Stratify payments by status
+    const successfulPayments = recentPayments.filter(p => p.status === 'success');
+    const failedPayments = recentPayments.filter(p => p.status === 'failed');
+    const abandonedPayments = recentPayments.filter(p => p.status === 'abandoned');
+    const otherPayments = recentPayments.filter(p => !['success', 'failed', 'abandoned'].includes(p.status));
+
+    // Calculate totals
+    const totalAmount = successfulPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const failedAmount = failedPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const abandonedAmount = abandonedPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+    // Extract therapist information
+    const getTherapistInfo = (payment) => {
+      const metadata = payment.metadata || {};
+      return {
+        therapist: metadata.therapist_name || 'Unknown',
+        meetingType: metadata.meeting_type || 'N/A',
+        location: metadata.location || 'N/A'
+      };
+    };
+
+    const summary = {
+      timeRange: {
+        from: hoursAgo.toISOString(),
+        to: now.toISOString(),
+        hoursBack
+      },
+      totals: {
+        totalTransactions: recentPayments.length,
+        successful: successfulPayments.length,
+        failed: failedPayments.length,
+        abandoned: abandonedPayments.length,
+        other: otherPayments.length
+      },
+      amounts: {
+        totalSuccessful: totalAmount,
+        totalFailed: failedAmount,
+        totalAbandoned: abandonedAmount,
+        currency: 'NGN'
+      },
+      details: {
+        successful: successfulPayments.map(payment => ({
+          reference: payment.reference,
+          amount: payment.amount,
+          customer: `${payment.metadata?.customer_first_name || ''} ${payment.metadata?.customer_last_name || ''}`.trim() || 'Unknown',
+          email: payment.customer?.email || 'N/A',
+          date: payment.created_at,
+          ...getTherapistInfo(payment)
+        })),
+        failed: failedPayments.map(payment => ({
+          reference: payment.reference,
+          amount: payment.amount,
+          customer: `${payment.metadata?.customer_first_name || ''} ${payment.metadata?.customer_last_name || ''}`.trim() || 'Unknown',
+          email: payment.customer?.email || 'N/A',
+          date: payment.created_at,
+          reason: payment.gateway_response || 'Unknown',
+          ...getTherapistInfo(payment)
+        })),
+        abandoned: abandonedPayments.map(payment => ({
+          reference: payment.reference,
+          amount: payment.amount,
+          customer: `${payment.metadata?.customer_first_name || ''} ${payment.metadata?.customer_last_name || ''}`.trim() || 'Unknown',
+          email: payment.customer?.email || 'N/A',
+          date: payment.created_at,
+          ...getTherapistInfo(payment)
+        }))
+      }
+    };
+
+    return {
+      success: true,
+      summary,
+      rawData: recentPayments
+    };
+
+  } catch (error) {
+    console.error(`Error getting payments summary: ${error.message}`);
+    await reportError('Payment Summary Error', error, {
+      operation: 'getPaymentsSummary',
+      hoursBack
+    });
+
+    return {
+      success: false,
+      message: error.message,
+      summary: null
+    };
+  }
+};
+
+// Route handler for manual summary
+const generatePaymentsSummaryReport = async (req, res) => {
+  try {
+    const hoursBack = parseInt(req.query.hours) || 12;
+    const result = await getPaymentsSummary(hoursBack);
+    
+    if (result.success) {
+      // Send email summary
+      await sendPaymentSummaryEmail(result.summary);
+      
+      res.status(200).json({
+        success: true,
+        message: `Payment summary for last ${hoursBack} hours generated and sent`,
+        summary: result.summary
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error(`Error generating payment summary: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate payment summary'
+    });
+  }
+};
+
 
 module.exports = {
   listPayments,
@@ -313,4 +472,6 @@ module.exports = {
   monitorPaymentStatuses,
   handlePaystackWebhook,
   extractSessionDataFromMetadata,
+  getPaymentsSummary,
+  generatePaymentsSummaryReport,
 };
