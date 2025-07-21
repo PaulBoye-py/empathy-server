@@ -30,6 +30,20 @@ const { default: mongoose } = require('mongoose');
 // CRON
 const { schedulePaymentSummaryJob } = require('./jobs/paymentSummaryJob');
 
+// KEEP ALIVE AND LOGGING
+// Import logging and keep-alive services
+const { 
+  logger, 
+  logServerStart, 
+  requestLogger, 
+  logError,
+  serverLogger 
+} = require('./utils/logger');
+const { startKeepAlive } = require('./jobs/keepAliveJob');
+const healthRoutes = require('./routes/health');
+
+// Request logging middleware (add early)
+app.use(requestLogger);
 
 const allowedOrigins = [
     process.env.FRONTENDURL,
@@ -84,6 +98,7 @@ usersConnection.on('error', (error) => {
 
 // Middleware for request logging (Morgan)
 app.use(morgan('combined')); // Log incoming requests
+
 // app.use(loggerMiddleware);
 
 
@@ -114,6 +129,9 @@ app.use('/api/v1/payment', flutterwaveRoute);
 
 // app.use('/api/v1/slack', slackNotificationRoute);
 
+// Health check routes (IMPORTANT: Must be available for keep-alive)
+app.use('/api/health', healthRoutes);
+
 app.use('/api/v1/auth', authRoute(therapistConnection))
 app.use('/api/v1/users', newUserRoute(therapistConnection))
 app.use('/api/v1/users', s3Router)
@@ -122,9 +140,30 @@ app.use('/api/v1/users', s3Router)
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World')
+  serverLogger.info('🏠 Root endpoint accessed');
+  res.json({ 
+    message: 'Therapy Hub API Server',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
 });
 
+
+// 404 handler
+app.use('*', (req, res) => {
+  logger.warn('🔍 Route not found', {
+    method: req.method,
+    url: req.url,
+    ip: req.ip
+  });
+  
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.url} not found`,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // if (process.env.ENVIRONMENT === 'production') {
 //     exports.handler = serverless(app);
@@ -135,9 +174,45 @@ app.get('/', (req, res) => {
 //   }
 
 // Start the server
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-    console.log(`Server is listening on port ${port}`);
+// const port = process.env.PORT || 4000;
+// app.listen(port, () => {
+//     console.log(`Server is listening on port ${port}`);
+// });
+
+const PORT = process.env.PORT || 4000;
+const server = app.listen(PORT, () => {
+  // Log server startup
+  logServerStart(PORT, process.env.NODE_ENV || 'development');
+
+  // Start background services after server is running
+  setTimeout(() => {
+    try {
+      // Start keep-alive service for Render free tier
+      if (process.env.NODE_ENV === 'production' && process.env.RENDER_SERVICE_NAME) {
+        serverLogger.info('🌐 Render deployment detected - starting keep-alive service');
+        startKeepAlive();
+      } else if (process.env.ENABLE_KEEP_ALIVE === 'true') {
+        serverLogger.info('🧪 Keep-alive service enabled via environment variable');
+        startKeepAlive();
+      } else {
+        serverLogger.info('💤 Keep-alive service disabled (not needed for local development)');
+      }
+
+      // Start payment summary cron job
+      schedulePaymentSummaryJob();
+
+      // Log successful startup
+      serverLogger.info('🎉 All services started successfully', {
+        port: PORT,
+        environment: process.env.NODE_ENV,
+        keepAlive: process.env.RENDER_SERVICE_NAME ? 'enabled' : 'disabled',
+        paymentSummary: 'enabled'
+      });
+
+    } catch (error) {
+      logError(error, { context: 'service_startup' });
+    }
+  }, 2000); // Wait 2 seconds for server to fully initialize
 });
 schedulePaymentSummaryJob();
 

@@ -33,6 +33,7 @@
     "nodemailer": "^6.10.1",
     "nodemon": "^3.0.1",
     "serverless-http": "^3.2.0",
-    "square": "^43.0.0"
+    "square": "^43.0.0",
+    "winston": "^3.17.0"
   }
 }
