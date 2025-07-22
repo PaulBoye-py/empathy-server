@@ -2,13 +2,19 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
+
 // Support team emails
-const SUPPORT_EMAILS = [
-  'paul.adeboye@yahoo.com',
-  'timiasha7@gmail.com',
-  // 'estherapyhub@gmail.com',
-  // 'asereopeyemimichael@gmail.com',
-];
+const SUPPORT_EMAILS = process.env.NODE_ENV === 'production' 
+  ? [
+      'estherapyhub@gmail.com',
+      'asereopeyemimichael@gmail.com',
+      'paul.adeboye@yahoo.com',
+      'timiasha7@gmail.com',
+    ]
+  : [
+      'paul.adeboye@yahoo.com',
+      'timiasha7@gmail.com',
+    ];
 
 
 // ✅ ZOHO SMTP Configuration
