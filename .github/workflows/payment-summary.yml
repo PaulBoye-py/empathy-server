@@ -66,7 +66,7 @@ jobs:
           echo "🩺 Checking server health..."
           
           # TODO: Replace YOUR_APP_NAME with your actual Render app name  
-          APP_URL="https://YOUR_APP_NAME.onrender.com"
+          APP_URL="https://empathy-server-test.onrender.com"
           
           HEALTH_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
             -H "User-Agent: GitHub-Actions-HealthCheck/1.0" \
