@@ -1,7 +1,7 @@
 # .github/workflows/payment-summary.yml
 # Copy this entire file to your project
 
-name: Payment Summary Cron Job
+name: Production Payment Summary Cron Job
 
 on:
   # Run every 12 hours at 12:00 AM and 12:00 PM UTC
