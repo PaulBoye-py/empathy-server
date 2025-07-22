@@ -163,8 +163,8 @@ const extractSessionDataFromMetadata = (paymentData) => {
         discountCode: metadata.discount_code,
         discountName: metadata.discount_name,
         // Include customer info from metadata since customer object might be empty
-        customerFirstName: metadata.customer_first_name,
-        customerLastName: metadata.customer_last_name,
+        customerFirstName: metadata.customer_first_name || paymentData.first_name,
+        customerLastName: metadata.customer_last_name || paymentData.last_name,
         customerLocation: metadata.customer_location
       };
     }
