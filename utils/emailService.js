@@ -180,7 +180,7 @@ const sendPaymentSummaryEmail = async (summary) => {
     const fromDate = new Date(timeRange.from).toLocaleString();
     const toDate = new Date(timeRange.to).toLocaleString();
     
-    const subject = `📊 Payment Summary Report - Last ${timeRange.hoursBack} Hours (${totals.totalTransactions} transactions)`;
+    const subject = `📊 EmpathySpace Consulting Payment Summary Report - Last ${timeRange.hoursBack} Hours (${totals.totalTransactions} transactions)`;
 
     // Calculate percentages
     const successRate = totals.totalTransactions > 0 ? ((totals.successful / totals.totalTransactions) * 100).toFixed(1) : 0;
