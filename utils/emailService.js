@@ -10,9 +10,9 @@ const SUPPORT_EMAILS = process.env.NODE_ENV === 'production'
       'asereopeyemimichael@gmail.com',
       'paul.adeboye@yahoo.com',
       'timiasha7@gmail.com',
-      'oaboderin1966@yahoo.com',
       'kunle.ogunsola@gmail.com',
       'drkaf@empathyspaceng.org',
+      'ayoolabajomo@gmail.com',
     ]
   : [
       'paul.adeboye@yahoo.com',
