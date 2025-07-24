@@ -16,7 +16,6 @@ const SUPPORT_EMAILS = process.env.NODE_ENV === 'production'
     ]
   : [
       'paul.adeboye@yahoo.com',
-      'timiasha7@gmail.com',
     ];
 
 
