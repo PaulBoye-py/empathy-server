@@ -86,7 +86,7 @@ const sendErrorNotification = async (errorType, errorDetails, clientData = null)
     `;
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.ZOHO_EMAIL,
       to: SUPPORT_EMAILS,
       subject: subject,
       html: htmlContent
