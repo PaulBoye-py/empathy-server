@@ -60,6 +60,7 @@ const allowedOrigins = [
     'https://therapist-backend-update.vercel.app',
     'https://therapist-backend-update-paulboyepys-projects.vercel.app',
     'https://admin.myempathyspace.com',
+    'https://main.dmotaszbywzfp.amplifyapp.com',
 ]
 const corsOptions ={
     origin: (origin, callback) => {
