@@ -18,6 +18,10 @@ const SUPPORT_EMAILS = process.env.NODE_ENV === 'production'
       'paul.adeboye@yahoo.com',
     ];
 
+const ERROR_NOTIFICATION_EMAILS = [
+   'paul.adeboye@yahoo.com',
+  'timiasha7@gmail.com',
+]
 
 // ✅ ZOHO SMTP Configuration
 const transporter = nodemailer.createTransport({
@@ -87,7 +91,7 @@ const sendErrorNotification = async (errorType, errorDetails, clientData = null)
 
     const mailOptions = {
       from: process.env.ZOHO_EMAIL,
-      to: SUPPORT_EMAILS,
+      to: ERROR_NOTIFICATION_EMAILS,
       subject: subject,
       html: htmlContent
     };
