@@ -104,6 +104,81 @@ const sendErrorNotification = async (errorType, errorDetails, clientData = null)
   }
 };
 
+// const sendPaymentStatusNotification = async (paymentData, status, clientData = null) => {
+//   try {
+//     const name = `${paymentData.metadata.customer_first_name} ${paymentData.metadata.customer_last_name}`
+//     const subject = `💳 Payment ${status.toUpperCase()} - ${name}`;
+    
+//     const statusColor = {
+//       'success': '#28a745',
+//       'failed': '#dc3545',
+//       'abandoned': '#ffc107'
+//     };
+
+//     const statusEmoji = {
+//       'success': '✅',
+//       'failed': '❌',
+//       'abandoned': '⚠️'
+//     };
+
+//     const htmlContent = `
+//       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+//         <h2 style="color: ${statusColor[status]}; border-bottom: 2px solid ${statusColor[status]}; padding-bottom: 10px;">
+//           ${statusEmoji[status]} Payment ${status.charAt(0).toUpperCase() + status.slice(1)} Notification
+//         </h2>
+        
+//         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+//           <h3 style="color: #495057; margin-top: 0;">Payment Information</h3>
+//           <p><strong>Reference:</strong> ${paymentData.reference}</p>
+//           <p><strong>Amount:</strong> ₦${(paymentData.amount / 100).toLocaleString()}</p>
+//           <p><strong>Status:</strong> <span style="color: ${statusColor[status]}; font-weight: bold;">${status.toUpperCase()}</span></p>
+//           <p><strong>Date:</strong> ${new Date(paymentData.created_at).toLocaleString()}</p>
+//           ${paymentData.paid_at ? `<p><strong>Paid At:</strong> ${new Date(paymentData.paid_at).toLocaleString()}</p>` : ''}
+//         </div>
+
+//         <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;">
+//           <h4 style="color: #495057; margin-top: 0;">Customer Details</h4>
+//           <p><strong>Name:</strong> ${name}</p>
+//           <p><strong>Email:</strong> ${paymentData.customer.email}</p>
+//           <p><strong>Phone:</strong> ${paymentData.customer.phone || 'N/A'}</p>
+//         </div>
+
+//         ${clientData ? `
+//         <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8;">
+//           <h4 style="color: #0c5460; margin-top: 0;">Therapy Session Details</h4>
+//           <p><strong>Selected Therapist:</strong> ${clientData.SelectedTherapist || 'N/A'}</p>
+//           <p><strong>Location:</strong> ${clientData.location || 'N/A'}</p>
+//           <p><strong>Meeting Type:</strong> ${clientData.meetingType || 'N/A'}</p>
+//           ${clientData.calendlyLink ? `<p><strong>Calendly Link:</strong> <a href="${clientData.calendlyLink}" style="color: #17a2b8;">${clientData.calendlyLink}</a></p>` : ''}
+//           ${clientData.discountCode ? `<p><strong>Discount Applied:</strong> ${clientData.discountName || clientData.discountCode}</p>` : ''}
+//         </div>
+//         ` : ''}
+
+//         ${status !== 'success' ? `
+//         <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+//           <h4 style="color: #721c24; margin-top: 0;">Action Required</h4>
+//           <p>This payment requires attention. Please follow up with the customer if necessary.</p>
+//           ${clientData?.SelectedTherapist ? `<p><strong>Therapist to Contact:</strong> ${clientData.SelectedTherapist}</p>` : ''}
+//         </div>
+//         ` : ''}
+//       </div>
+//     `;
+
+//     const mailOptions = {
+//       from: process.env.ZOHO_EMAIL,
+//       to: SUPPORT_EMAILS,
+//       subject: subject,
+//       html: htmlContent
+//     };
+
+//     await transporter.sendMail(mailOptions);
+//     console.log(`Payment ${status} notification email sent successfully`);
+    
+//   } catch (error) {
+//     console.error('Failed to send payment notification email:', error);
+//   }
+// };
+
 const sendPaymentStatusNotification = async (paymentData, status, clientData = null) => {
   try {
     const name = `${paymentData.metadata.customer_first_name} ${paymentData.metadata.customer_last_name}`
@@ -121,6 +196,17 @@ const sendPaymentStatusNotification = async (paymentData, status, clientData = n
       'abandoned': '⚠️'
     };
 
+    // ✅ FIX: Detect currency properly
+    const currency = paymentData.currency || 'NGN';
+    const isUSD = currency === 'USD';
+    const currencySymbol = isUSD ? '$' : '₦';
+    
+    // ✅ FIX: Format amount with proper validation
+    const amount = paymentData.amount || 0;
+    const formattedAmount = isUSD 
+      ? `${currencySymbol}${(amount).toFixed(2)}`
+      : `${currencySymbol}${(amount / 100).toLocaleString()}`;
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: ${statusColor[status]}; border-bottom: 2px solid ${statusColor[status]}; padding-bottom: 10px;">
@@ -129,18 +215,19 @@ const sendPaymentStatusNotification = async (paymentData, status, clientData = n
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #495057; margin-top: 0;">Payment Information</h3>
-          <p><strong>Reference:</strong> ${paymentData.reference}</p>
-          <p><strong>Amount:</strong> ₦${(paymentData.amount / 100).toLocaleString()}</p>
+          <p><strong>Reference:</strong> ${paymentData.reference || 'N/A'}</p>
+          <p><strong>Amount:</strong> ${formattedAmount}</p>
+          <p><strong>Currency:</strong> ${currency}</p>
           <p><strong>Status:</strong> <span style="color: ${statusColor[status]}; font-weight: bold;">${status.toUpperCase()}</span></p>
-          <p><strong>Date:</strong> ${new Date(paymentData.created_at).toLocaleString()}</p>
+          <p><strong>Date:</strong> ${paymentData.created_at ? new Date(paymentData.created_at).toLocaleString() : 'N/A'}</p>
           ${paymentData.paid_at ? `<p><strong>Paid At:</strong> ${new Date(paymentData.paid_at).toLocaleString()}</p>` : ''}
         </div>
 
         <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h4 style="color: #495057; margin-top: 0;">Customer Details</h4>
           <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${paymentData.customer.email}</p>
-          <p><strong>Phone:</strong> ${paymentData.customer.phone || 'N/A'}</p>
+          <p><strong>Email:</strong> ${paymentData.customer?.email || 'N/A'}</p>
+          <p><strong>Phone:</strong> ${paymentData.customer?.phone || 'N/A'}</p>
         </div>
 
         ${clientData ? `
@@ -176,6 +263,9 @@ const sendPaymentStatusNotification = async (paymentData, status, clientData = n
     
   } catch (error) {
     console.error('Failed to send payment notification email:', error);
+    // Log the data for debugging
+    console.error('Payment data:', JSON.stringify(paymentData, null, 2));
+    console.error('Client data:', JSON.stringify(clientData, null, 2));
   }
 };
 

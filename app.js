@@ -1,3 +1,17 @@
+console.log('🚀 Starting app.js...');
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 CRASH! Uncaught Exception:', error.message);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 CRASH! Unhandled Rejection:', reason);
+  console.error('Promise:', promise);
+  process.exit(1);
+});
+
 const serverless = require('serverless-http');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -5,7 +19,7 @@ const cors = require('cors');
 const app = express();
 const morgan = require('morgan');
 const loggerMiddleware = require('./middleware/loggerMiddleware');
-const sqlRoutes = require('./routes/sqlRoutes')
+// const sqlRoutes = require('./routes/sqlRoutes')
 const mongoRoutes = require('./routes/mongoRoutes')
 const paymentRoute = require('./routes/paymentRoute')
 const flutterwaveRoute = require('./routes/flutterwaveRoute')
@@ -26,6 +40,9 @@ const errorReportingRoutes = require('./routes/errorReporting');
 const paystackRoutes = require('./routes/paystack');
 const { errorReportingMiddleware } = require('./middleware/errorReporting');
 const { default: mongoose } = require('mongoose');
+
+// SQUAD 
+const squadRoute = require('./routes/squadRoute');
 
 // CRON
 const { schedulePaymentSummaryJob } = require('./jobs/paymentSummaryJob');
@@ -80,7 +97,7 @@ const therapistMongoUri = process.env.THERAPISTS_MONGODB_URI;
 const usersMongoUri = process.env.USERS_MONGODB_URI;
 
 // Separate connection for therapist database
-const therapistConnection = mongoose.createConnection(therapistMongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+const therapistConnection = mongoose.createConnection(therapistMongoUri);
 therapistConnection.on('connected', () => {
     console.log('Connected to therapist MongoDB');
 });
@@ -89,7 +106,7 @@ therapistConnection.on('error', (error) => {
 });
 
 // Separate connection for users database
-const usersConnection = mongoose.createConnection(usersMongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+const usersConnection = mongoose.createConnection(usersMongoUri);
 usersConnection.on('connected', () => {
     console.log('Connected to users MongoDB');
 });
@@ -115,7 +132,7 @@ app.use(express.json());
 
 app.use(cors(corsOptions));
 
-app.use('/api/v1/professionals', sqlRoutes);
+// app.use('/api/v1/professionals', sqlRoutes);
 
 app.use('/api/v1/professionals', therapistsController(therapistConnection))
 
@@ -124,6 +141,9 @@ app.use('/api/v1/promo', promoCodeController(therapistConnection))
 app.use('/api/v1/booking', mongoRoutes);
 
 app.use('/api/v1/payment', paystackRoutes);
+
+app.use('/api/v1/payment/squad', squadRoute);
+
 app.use('/api/v1/errors', errorReportingRoutes);
 
 app.use('/api/v1/payment', flutterwaveRoute);
