@@ -3,27 +3,36 @@ const { sendErrorNotification } = require('../utils/emailService');
 
 // Middleware to catch and report errors
 const errorReportingMiddleware = (err, req, res, next) => {
-  // Log error to console
-  console.error('Error caught by middleware:', err);
+  // Skip reporting CORS errors from HTTP origins (likely bots/health checks)
+  const isHttpCorsError = err.message === 'Not allowed by CORS' && 
+    req.headers.origin && 
+    req.headers.origin.startsWith('http://');
+  
+  if (isHttpCorsError) {
+    console.log('Skipping CORS error report for HTTP origin:', req.headers.origin);
+  } else {
+    // Log error to console
+    console.error('Error caught by middleware:', err);
 
-  // Prepare error details for email
-  const errorDetails = {
-    message: err.message,
-    stack: err.stack,
-    method: req.method,
-    url: req.url,
-    headers: req.headers,
-    body: req.body,
-    params: req.params,
-    query: req.query,
-    timestamp: new Date().toISOString()
-  };
+    // Prepare error details for email
+    const errorDetails = {
+      message: err.message,
+      stack: err.stack,
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      body: req.body,
+      params: req.params,
+      query: req.query,
+      timestamp: new Date().toISOString()
+    };
 
-  // Send error notification email (don't await to avoid blocking response)
-  sendErrorNotification('API Error', errorDetails, req.user || null)
-    .catch(emailError => {
-      console.error('Failed to send error notification:', emailError);
-    });
+    // Send error notification email (don't await to avoid blocking response)
+    sendErrorNotification('API Error', errorDetails, req.user || null)
+      .catch(emailError => {
+        console.error('Failed to send error notification:', emailError);
+      });
+  }
 
   // Send error response
   if (res.headersSent) {
