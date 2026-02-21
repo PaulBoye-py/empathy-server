@@ -10,6 +10,8 @@ const bookingSchema = new mongoose.Schema({
   location: String,
   appointmentDate: { type: Date, default: Date.now },
   therapistName: String,
+  receiptUrl: String,
+  paymentReference: String,
 });
 
 // Create a Mongoose model

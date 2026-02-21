@@ -14,7 +14,7 @@ const mongoController = {
 // Insert data
 saveNewBooking: async (bookingDetails) => {
   try {
-    const { firstName, lastName, email,  meetingType, location,therapistName, appointmentDate } = bookingDetails;
+    const { firstName, lastName, email,  meetingType, location,therapistName, appointmentDate, receiptUrl, paymentReference } = bookingDetails;
     if (!firstName || !lastName || !email || !therapistName || !appointmentDate) {
       return 'Missing required fields.';
     }
@@ -27,6 +27,8 @@ saveNewBooking: async (bookingDetails) => {
       meetingType,
       location,
       appointmentDate,
+      receiptUrl,
+      paymentReference,
     });
 
     await newBooking.save();
@@ -47,6 +49,29 @@ saveNewBooking: async (bookingDetails) => {
     return 'New booking created for the patient.';
   } catch (error) {
     return `Error: ${error.message}`;
+  }
+},
+
+getBookings: async (filters) => {
+  try {
+    const query = {};
+    
+    if (filters.email) query.email = filters.email;
+    if (filters.firstName) query.firstName = new RegExp(filters.firstName, 'i');
+    if (filters.lastName) query.lastName = new RegExp(filters.lastName, 'i');
+    if (filters.meetingType) query.meetingType = filters.meetingType;
+    if (filters.therapistName) query.therapistName = new RegExp(filters.therapistName, 'i');
+    if (filters.date) {
+      const startDate = new Date(filters.date);
+      const endDate = new Date(filters.date);
+      endDate.setDate(endDate.getDate() + 1);
+      query.appointmentDate = { $gte: startDate, $lt: endDate };
+    }
+
+    const bookings = await Booking.find(query).sort({ appointmentDate: -1 });
+    return bookings;
+  } catch (error) {
+    throw new Error(`Error fetching bookings: ${error.message}`);
   }
 },
 }
