@@ -4,12 +4,19 @@ const createTherapistModel = require('../models/therapist');  // Adjust the path
 
 const connectionString = process.env.THERAPISTS_MONGODB_URI
 
-mongoose.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
-    console.log('Connected to MongoDB - update therapist');
+mongoose.connect(connectionString)
+.then(() => {
+    console.log('✅ Therapist MongoDB connected successfully');
   })
   .catch((error) => {
-    console.error('Error connecting to MongoDB: - update therapist', error.message);
+    console.error('❌ Therapist MongoDB connection error:', error.message);
+    // Don't crash the app immediately
+    setTimeout(() => {
+      console.log('Retrying Therapist MongoDB connection...');
+      mongoose.connect(mongoUri).catch(err => {
+        console.error('Failed to reconnect:', err.message);
+      });
+    }, 5000);
   });
 
 const connection = mongoose.connection;

@@ -6,10 +6,20 @@ const mongoURI = process.env.MONGODB_URI
 console.log('mongo uri', mongoURI)
 
 // Connect to MongoDB
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(mongoURI)
+.then(() => {
+    console.log('✅ MongoDB connected successfully');
+  })
+  .catch((error) => {
+    console.error('❌ MongoDB connection error:', error.message);
+    // Don't crash the app immediately
+    setTimeout(() => {
+      console.log('Retrying MongoDB connection...');
+      mongoose.connect(mongoURI).catch(err => {
+        console.error('Failed to reconnect:', err.message);
+      });
+    }, 5000);
+  });
 
 const db = mongoose.connection;
 
