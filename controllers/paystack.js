@@ -1,35 +1,3 @@
-// require('dotenv').config();
-// const axios = require('axios');
-
-// const listPayments = async (req, res) => {
-//   try {
-//     const secretKey = process.env.ENVIRONMENT === 'production'
-//       ? process.env.SECRET_KEY
-//       : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
-
-//     const response = await axios.get('http://api.paystack.co/transaction', {
-//       headers: {
-//         Authorization: `Bearer ${secretKey}`,
-//       },
-//     });
-//      // Handle the response from Paystack API
-//      const { data } = response.data;
-//      // You can process 'data' here and extract payment status or other details
- 
-//      res.status(200).json(data);
-
-//     // console.log('paystack payments', response.data);
-
-//   } catch (error) {
-//     console.error(`Error listing payments: ${error.message}`);
-//   }
-// };
-
-// module.exports = {
-//   listPayments,
-// };
-
-// controllers/paystack.js
 require('dotenv').config();
 const axios = require('axios');
 const { sendPaymentStatusNotification } = require('../utils/emailService');
@@ -37,6 +5,8 @@ const { reportError } = require('../middleware/errorReporting');
 
 const listPayments = async (req, res) => {
   try {
+    const { page = 1, perPage = 100 } = req.query;
+    
     const secretKey = process.env.ENVIRONMENT === 'production'
       ? process.env.SECRET_KEY
       : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
@@ -45,6 +15,10 @@ const listPayments = async (req, res) => {
       headers: {
         Authorization: `Bearer ${secretKey}`,
       },
+      params: {
+        page,
+        perPage
+      }
     });
 
     const { data } = response.data;
@@ -53,7 +27,6 @@ const listPayments = async (req, res) => {
   } catch (error) {
     console.error(`Error listing payments: ${error.message}`);
     
-    // Report this error to support team
     await reportError('Paystack API Error', error, {
       operation: 'listPayments',
       endpoint: 'https://api.paystack.co/transaction'
@@ -66,6 +39,7 @@ const listPayments = async (req, res) => {
     });
   }
 };
+
 
 const verifyPayment = async (req, res) => {
   try {

@@ -8,7 +8,10 @@ const deleteBookingsByEmail = async () => {
     console.log('Connected to MongoDB');
 
     const result = await Booking.deleteMany({
-      email: { $regex: /^paul\.ade/i }
+      $or: [
+        { email: { $regex: /^paul\.deroju/i } },
+        { firstName: { $in: ['paul', 'john', 'Paul', 'John', 'PAUL', 'JOHN'] } }
+      ]
     });
 
     console.log(`Deleted ${result.deletedCount} booking(s)`);
