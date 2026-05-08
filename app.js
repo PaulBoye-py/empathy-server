@@ -78,6 +78,7 @@ const allowedOrigins = [
     'https://therapist-backend-update-paulboyepys-projects.vercel.app',
     'https://admin.myempathyspace.com',
     'https://main.dmotaszbywzfp.amplifyapp.com',
+    'https://api.myempathyspace.com',
 ]
 const corsOptions ={
     origin: (origin, callback) => {
