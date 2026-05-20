@@ -28,6 +28,14 @@ const therapistSchema = new mongoose.Schema({
   discount_virtual_pounds: Number,
   description: String,  // Added new field
   isActive: Boolean, //
+  email: String, //
+  packages: {
+    type: [String],
+    enum: ["soberup", "ololufe"],
+    default: [],  // ← Add this
+    description: "List of packages this therapists offer"
+  }
+
 })
 
 therapistSchema.set('toJSON', {
