@@ -27,7 +27,7 @@ router.post('/booking', async (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
 
   try {
-    const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate, receiptUrl, paymentReference } = req.body;
+    const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate, receiptUrl, paymentReference, packageName } = req.body;
     const bookingDetails = {
       firstName,
       lastName,
@@ -38,6 +38,7 @@ router.post('/booking', async (req, res) => {
       appointmentDate,
       receiptUrl,
       paymentReference,
+      packageName,
     };
     const result = await mongoController.saveNewBooking(bookingDetails);
     res.json(result);

@@ -1,4 +1,5 @@
 // utils/logger.js
+const fs = require('fs');
 const winston = require('winston');
 const path = require('path');
 
@@ -48,6 +49,9 @@ const fileFormat = winston.format.combine(
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 // Logger configuration
 const logger = winston.createLogger({

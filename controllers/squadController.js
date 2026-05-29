@@ -1,7 +1,7 @@
-// require('dotenv').config();
-// const axios = require('axios');
-// const { sendPaymentStatusNotification } = require('../utils/emailService');
-// const { reportError } = require('../middleware/errorReporting');
+require('dotenv').config();
+const { sendPaymentStatusNotification } = require('../utils/emailService');
+const { reportError } = require('../middleware/errorReporting');
+const { paymentLogger, logError } = require('../utils/logger');
 
 // const listPayments = async (req, res) => {
 //     try {
@@ -365,9 +365,6 @@
 // };
 
 // controllers/squadController.js
-require('dotenv').config();
-const { sendPaymentStatusNotification } = require('../utils/emailService');
-const { reportError } = require('../middleware/errorReporting');
 
 /**
  * Process Squad Payment
@@ -509,84 +506,75 @@ const { reportError } = require('../middleware/errorReporting');
 const processSquadPayment = async (req, res) => {
   try {
     const { squadData, metadata, transactionRef, status, isSuccess } = req.body;
-    
-    console.log('\n==========================================');
-    console.log('📦 Processing Squad Payment');
-    console.log('==========================================');
-    console.log('Transaction Ref:', transactionRef);
-    console.log('Status:', status);
-    console.log('Is Success:', isSuccess);
-    console.log('==========================================\n');
-    
+
+    paymentLogger.info('Processing Squad payment request', {
+      transactionRef,
+      status,
+      isSuccess,
+      customerEmail: squadData?.email || metadata?.customer_email
+    });
+
     if (!squadData || !transactionRef) {
+      paymentLogger.warn('Missing Squad payment payload', {
+        missingSquadData: !squadData,
+        missingTransactionRef: !transactionRef
+      });
       return res.status(400).json({
         success: false,
         message: 'Missing required payment data'
       });
     }
-    
-    // ✅ Extract metadata from Squad's 'meta' field
+
     const squadMeta = squadData.meta || {};
-
     const squadFullData = squadData.data || {};
-    
-    // ✅ Extract complete session data
-    const sessionData = {
-      // From Squad meta (camelCase)
-      SelectedTherapist: squadMeta.SelectedTherapist || metadata.therapist_name,
-      location: squadMeta.location || metadata.location,
-      meetingType: squadMeta.meetingType || metadata.meeting_type,
-      calendlyLink: squadMeta.calendlyLink || metadata.calendly_link,
-      discountCode: squadMeta.discountCode || metadata.discount_code,
-      discountName: squadMeta.discountName || metadata.discount_name,
-      customerFirstName: squadMeta.customerFirstName || metadata.customer_first_name,
-      customerLastName: squadMeta.customerLastName || metadata.customer_last_name,
-      customerLocation: squadMeta.location || metadata.location,
-      
-      // From Squad data
-      customerEmail: squadData.email || metadata.customer_email,
-      customerName: `${squadMeta.customerFirstName || metadata.customer_first_name} ${squadMeta.customerLastName || metadata.customer_last_name}`,
-      amount: squadData.transaction_amount || metadata.amount,
-      currency: squadData.transaction_currency_id || metadata.currency,
-      transactionRef: transactionRef,
-      gatewayRef: squadFullData.gateway_transaction_ref || metadata.gateway_transaction_ref,
-      merchantName: squadFullData.merchant_name,
-      paymentDate: squadFullData.created_at|| metadata.created_at,
-    };
-    
-    console.log('📋 Session Data:', sessionData);
 
-    // ✅ Transform Squad data to match Paystack format for email service
+    const sessionData = {
+      SelectedTherapist: squadMeta.SelectedTherapist || metadata?.therapist_name,
+      location: squadMeta.location || metadata?.location,
+      meetingType: squadMeta.meetingType || metadata?.meeting_type,
+      calendlyLink: squadMeta.calendlyLink || metadata?.calendly_link,
+      discountCode: squadMeta.discountCode || metadata?.discount_code,
+      discountName: squadMeta.discountName || metadata?.discount_name,
+      customerFirstName: squadMeta.customerFirstName || metadata?.customer_first_name,
+      customerLastName: squadMeta.customerLastName || metadata?.customer_last_name,
+      customerLocation: squadMeta.location || metadata?.location,
+      customerEmail: squadData.email || metadata?.customer_email,
+      customerName: `${squadMeta.customerFirstName || metadata?.customer_first_name || ''} ${squadMeta.customerLastName || metadata?.customer_last_name || ''}`.trim(),
+      amount: squadData.transaction_amount || metadata?.amount,
+      currency: squadData.transaction_currency_id || metadata?.currency,
+      transactionRef,
+      gatewayRef: squadFullData.gateway_transaction_ref || metadata?.gateway_transaction_ref,
+      merchantName: squadFullData.merchant_name,
+      paymentDate: squadFullData.created_at || metadata?.created_at
+    };
+
+    paymentLogger.info('Prepared Squad session data', sessionData);
+
     const transformedPaymentData = {
       reference: transactionRef,
-      amount: squadData.transaction_amount || metadata.amount, // Already in kobo/cents
-      created_at: squadFullData.created_at|| metadata.created_at,
+      amount: squadData.transaction_amount || metadata?.amount,
+      created_at: squadFullData.created_at || metadata?.created_at,
       status: squadFullData.transaction_status,
-      currency: metadata.currency,
+      currency: metadata?.currency,
       isCurrency: 'USD',
-      
-      // ✅ Add metadata in Paystack format (snake_case)
       metadata: {
-        customer_first_name: squadMeta.customerFirstName || metadata.customer_first_name,
-        customer_last_name: squadMeta.customerLastName || metadata.customer_last_name,
-        therapist_name: squadMeta.SelectedTherapist || metadata.therapist_name,
-        location: squadMeta.location || metadata.location,
-        meeting_type: squadMeta.meetingType || metadata.meeting_type,
-        calendly_link: squadMeta.calendlyLink || metadata.calendly_link,
-        discount_code: squadMeta.discountCode || metadata.discount_code,
-        discount_name: squadMeta.discountName || metadata.discount_name,
+        customer_first_name: squadMeta.customerFirstName || metadata?.customer_first_name,
+        customer_last_name: squadMeta.customerLastName || metadata?.customer_last_name,
+        therapist_name: squadMeta.SelectedTherapist || metadata?.therapist_name,
+        location: squadMeta.location || metadata?.location,
+        meeting_type: squadMeta.meetingType || metadata?.meeting_type,
+        calendly_link: squadMeta.calendlyLink || metadata?.calendly_link,
+        discount_code: squadMeta.discountCode || metadata?.discount_code,
+        discount_name: squadMeta.discountName || metadata?.discount_name
       },
-      
-      // ✅ Add customer object in Paystack format
       customer: {
-        email: metadata.customer_email,
-        phone: 'N/A', // Squad doesn't return phone
+        email: metadata?.customer_email,
+        phone: 'N/A'
       }
     };
-    
-    console.log('📧 Transformed Payment Data for Email:', transformedPaymentData);
-    
-    // ✅ Send response immediately
+
+    paymentLogger.debug('Transformed Squad payment payload for email service', transformedPaymentData);
+
     res.status(200).json({
       success: true,
       message: 'Payment processing initiated',
@@ -596,48 +584,53 @@ const processSquadPayment = async (req, res) => {
         processingStarted: true
       }
     });
-    
-    // ============================================
-    // ✅ ASYNC OPERATIONS (Don't block response)
-    // ============================================
-    
+
     if (isSuccess) {
-      console.log('✅ Processing successful payment...');
-      
-      // ✅ Send success email with transformed data
+      paymentLogger.info('Processing successful Squad payment', {
+        transactionRef,
+        amount: sessionData.amount,
+        customerEmail: sessionData.customerEmail
+      });
+
       sendPaymentStatusNotification(transformedPaymentData, 'success', sessionData)
-        .then(() => console.log('✅ Success email sent'))
-        .catch(error => {
-          console.error('❌ Failed to send success email:', error.message);
-          console.error('Error details:', error);
-        });
-      
-      // Save to database
+        .then(() => paymentLogger.info('Success notification sent for Squad payment', { transactionRef }))
+        .catch(error => paymentLogger.error('Failed to send success notification for Squad payment', {
+          transactionRef,
+          error: error.message
+        }));
+
       savePaymentToDatabase(squadData, sessionData)
-        .then(() => console.log('✅ Payment saved to database'))
-        .catch(error => console.error('❌ Failed to save payment:', error.message));
-      
-      console.log('💰 Payment Details:', {
+        .then(() => paymentLogger.info('Saved Squad payment to database', { transactionRef }))
+        .catch(error => paymentLogger.error('Failed to save Squad payment to database', {
+          transactionRef,
+          error: error.message
+        }));
+
+      paymentLogger.debug('Squad payment detail summary', {
         reference: transactionRef,
-        amount: metadata.amount,
-        email: metadata.customer_email,
-        customer: `${sessionData.customerFirstName} ${sessionData.customerLastName}`,
+        amount: metadata?.amount,
+        email: metadata?.customer_email,
+        customer: sessionData.customerName,
         therapist: sessionData.SelectedTherapist,
         meetingType: sessionData.meetingType
       });
-      
     } else {
-      console.log(`⚠️ Processing ${status} payment...`);
-      
-      // ✅ Send failure/pending email with transformed data
+      paymentLogger.warn('Processing non-success Squad payment', {
+        transactionRef,
+        status,
+        amount: sessionData.amount
+      });
+
       sendPaymentStatusNotification(transformedPaymentData, status, sessionData)
-        .then(() => console.log(`✅ ${status} email sent`))
-        .catch(error => console.error(`❌ Failed to send ${status} email:`, error.message));
-      
-      // Report error
+        .then(() => paymentLogger.info(`Notification sent for Squad payment status ${status}`, { transactionRef }))
+        .catch(error => paymentLogger.error(`Failed to send ${status} notification for Squad payment`, {
+          transactionRef,
+          error: error.message
+        }));
+
       reportError(
-        `Squad Payment ${status}`, 
-        new Error(`Payment ${status} for reference: ${transactionRef}`), 
+        `Squad Payment ${status}`,
+        new Error(`Payment ${status} for reference: ${transactionRef}`),
         {
           transactionRef,
           status,
@@ -646,23 +639,27 @@ const processSquadPayment = async (req, res) => {
           squadData,
           sessionData
         }
-      ).catch(error => console.error('❌ Failed to report error:', error.message));
+      ).catch(error => paymentLogger.error('Failed to report Squad payment status event', {
+        transactionRef,
+        error: error.message
+      }));
     }
-    
-    console.log('==========================================');
-    console.log('✅ Payment processing completed');
-    console.log('==========================================\n');
-    
+
+    paymentLogger.info('Finished Squad payment processing flow', { transactionRef });
   } catch (error) {
-    console.error('❌ Error processing payment:', error.message);
-    console.error('Stack:', error.stack);
-    
-    // Report processing error
+    paymentLogger.error('Error processing Squad payment', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+
     reportError('Squad Payment Processing Error', error, {
       operation: 'processSquadPayment',
       body: req.body
-    }).catch(err => console.error('❌ Failed to report error:', err.message));
-    
+    }).catch(err => paymentLogger.error('Failed to report Squad payment processing error', {
+      error: err.message
+    }));
+
     res.status(500).json({
       success: false,
       message: 'Payment processing failed',
@@ -676,7 +673,11 @@ const processSquadPayment = async (req, res) => {
  */
 const savePaymentToDatabase = async (squadData, sessionData) => {
   try {
-    console.log('💾 Saving payment to database...');
+    paymentLogger.info('Saving Squad payment to database', {
+      transactionRef: squadData?.transaction_ref,
+      amount: squadData?.transaction_amount,
+      status: squadData?.transaction_status
+    });
     
     // TODO: Implement your database save logic here
     // Example:
@@ -709,26 +710,16 @@ const savePaymentToDatabase = async (squadData, sessionData) => {
     });
     
     await payment.save();
-    console.log('Payment saved with ID:', payment._id);
+    paymentLogger.info('Payment saved to database', { paymentId: payment._id });
     */
     
-    console.log('✅ Payment saved successfully');
+    paymentLogger.info('✅ Payment saved successfully');
     
   } catch (error) {
-    console.error('❌ Error saving payment to database:', error);
+    paymentLogger.error('Error saving payment to database', { error: error.message, stack: error.stack });
     throw error;
   }
 };
-
-module.exports = {
-  processSquadPayment,
-  savePaymentToDatabase
-};
-
-/**
- * Save payment to database
- */
-
 
 module.exports = {
   processSquadPayment,

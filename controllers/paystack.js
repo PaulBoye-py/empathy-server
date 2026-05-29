@@ -2,8 +2,11 @@ require('dotenv').config();
 const axios = require('axios');
 const { sendPaymentStatusNotification } = require('../utils/emailService');
 const { reportError } = require('../middleware/errorReporting');
+const { paymentLogger, logError } = require('../utils/logger');
 
 const listPayments = async (req, res) => {
+  const { page = 1, perPage = 100 } = req.query;
+  paymentLogger.info('Listing Paystack payments', { page, perPage });
   try {
     const { page = 1, perPage = 100 } = req.query;
     
@@ -25,12 +28,14 @@ const listPayments = async (req, res) => {
     res.status(200).json(data);
 
   } catch (error) {
-    console.error(`Error listing payments: ${error.message}`);
-    
-    await reportError('Paystack API Error', error, {
-      operation: 'listPayments',
-      endpoint: 'https://api.paystack.co/transaction'
+    paymentLogger.error('Error listing Paystack payments', {
+      page,
+      perPage,
+      error: error.message,
+      stack: error.stack
     });
+
+    logError(error, { operation: 'listPayments', endpoint: 'https://api.paystack.co/transaction' });
 
     res.status(500).json({
       success: false,
@@ -66,59 +71,73 @@ const verifyPayment = async (req, res) => {
     );
 
     const { data } = response.data;
-    console.log('verification data', data)
 
     if (!data) {
+      paymentLogger.warn('Paystack verification returned no payment data', { reference });
       throw new Error('No payment data received from Paystack');
     }
 
-    // ✅ Extract session data from metadata (no redundant parameter needed)
     const sessionData = extractSessionDataFromMetadata(data);
+    paymentLogger.info('Paystack verification completed', {
+      reference,
+      status: data.status,
+      amount: data.amount,
+      currency: data.currency,
+      customerEmail: data.customer?.email
+    });
 
-    // ✅ IMPORTANT: Send response IMMEDIATELY, handle notifications asynchronously
     const responsePayload = {
       success: data.status === 'success',
       message: data.status === 'success' ? 'Payment verified successfully' : 'Payment verification failed',
-      data: data
+      data
     };
 
-    // Send response first (don't wait for email)
     res.status(200).json(responsePayload);
 
-    // ✅ Handle notifications asynchronously (don't block response)
     if (data.status !== 'success') {
-      // Send notification for failed verification (async)
       sendPaymentStatusNotification(data, data.status, sessionData)
-        .catch(error => console.error('Failed to send failure notification:', error));
-      
-      // Report error (async)
+        .catch(error => paymentLogger.error('Failed to send failure notification', {
+          reference,
+          error: error.message
+        }));
+
       reportError('Payment Verification Failed', new Error(`Payment verification failed for reference: ${reference}`), {
         reference,
         status: data.status,
         paymentData: data,
         sessionData
-      }).catch(error => console.error('Failed to report error:', error));
-      
+      }).catch(error => paymentLogger.error('Failed to report payment verification failure', {
+        reference,
+        error: error.message
+      }));
     } else {
-      // ✅ REMOVE: Don't send notifications for successful payments (causes unnecessary delay)
-      sendPaymentStatusNotification(data, 'success', sessionData);
-      // Success notifications are not needed since payment worked
-      console.log(`✅ Payment verified successfully: ${reference}`);
+      sendPaymentStatusNotification(data, 'success', sessionData)
+        .catch(error => paymentLogger.warn('Failed to send success notification', {
+          reference,
+          error: error.message
+        }));
+      paymentLogger.info('Payment verified successfully', { reference });
     }
 
   } catch (error) {
-    console.error(`Error verifying payment: ${error.message}`);
-    
-    // Report error asynchronously (don't block response)
+    const errorMessage = error.response?.data || error.message;
+    paymentLogger.error('Error verifying Paystack payment', {
+      reference,
+      error: errorMessage
+    });
+
     reportError('Payment Verification Error', error, {
       operation: 'verifyPayment',
       reference: req.params.reference
-    }).catch(reportingError => console.error('Failed to report error:', reportingError));
+    }).catch(reportingError => paymentLogger.error('Failed to report payment verification error', {
+      reference,
+      error: reportingError.message
+    }));
 
     res.status(500).json({
       success: false,
       message: 'Payment verification failed',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message
+      error: process.env.NODE_ENV === 'production' ? undefined : errorMessage
     });
   }
 };
@@ -164,42 +183,53 @@ const handlePaystackWebhook = async (req, res) => {
     }
 
     const { event, data } = req.body;
-
-    // Extract session data from webhook payload
     const sessionData = extractSessionDataFromMetadata(data);
+    paymentLogger.info('Received Paystack webhook', {
+      event,
+      reference: data?.reference,
+      status: data?.status,
+      amount: data?.amount
+    });
 
     switch (event) {
       case 'charge.success':
-        console.log('✅ Payment successful:', data.reference);
-        // Send success notification with therapist info
+        paymentLogger.info('Paystack charge.success event', {
+          reference: data.reference
+        });
         if (sessionData) {
           await sendPaymentStatusNotification(data, 'success', sessionData);
         }
         break;
-        
+
       case 'charge.failed':
-        console.log('❌ Payment failed:', data.reference);
+        paymentLogger.warn('Paystack charge.failed event', {
+          reference: data.reference
+        });
         await sendPaymentStatusNotification(data, 'failed', sessionData);
         break;
-        
+
       case 'charge.dispute.create':
-        console.log('⚠️ Payment disputed:', data.reference);
+        paymentLogger.warn('Paystack charge.dispute.create event', {
+          reference: data.reference
+        });
         await sendPaymentStatusNotification(data, 'disputed', sessionData);
         break;
 
       default:
-        console.log('📦 Unhandled webhook event:', event);
+        paymentLogger.info('Unhandled Paystack webhook event', { event });
     }
 
     res.status(200).json({ message: 'Webhook processed' });
 
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    paymentLogger.error('Paystack webhook processing error', {
+      error: error.message,
+      event: req.body?.event
+    });
     await reportError('Paystack Webhook Error', error, {
       operation: 'handlePaystackWebhook',
       event: req.body?.event
     });
-    
     res.status(500).json({ message: 'Webhook processing failed' });
   }
 };
@@ -266,12 +296,13 @@ const monitorPaymentStatuses = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(`Error monitoring payment statuses: ${error.message}`);
-    
+    paymentLogger.error('Error monitoring payment statuses', {
+      error: error.message,
+      stack: error.stack
+    });
     await reportError('Payment Monitoring Error', error, {
       operation: 'monitorPaymentStatuses'
     });
-    
     res.status(500).json({
       success: false,
       message: 'Payment monitoring failed',
@@ -394,7 +425,11 @@ const getPaymentsSummary = async (hoursBack = 12) => {
     };
 
   } catch (error) {
-    console.error(`Error getting payments summary: ${error.message}`);
+    paymentLogger.error('Error getting Paystack payments summary', {
+      hoursBack,
+      error: error.message,
+      stack: error.stack
+    });
     await reportError('Payment Summary Error', error, {
       operation: 'getPaymentsSummary',
       hoursBack
@@ -431,7 +466,10 @@ const generatePaymentsSummaryReport = async (req, res) => {
     }
 
   } catch (error) {
-    console.error(`Error generating payment summary: ${error.message}`);
+    paymentLogger.error('Error generating payment summary report', {
+      error: error.message,
+      stack: error.stack
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to generate payment summary'

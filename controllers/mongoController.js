@@ -14,8 +14,8 @@ const mongoController = {
 // Insert data
 saveNewBooking: async (bookingDetails) => {
   try {
-    const { firstName, lastName, email,  meetingType, location,therapistName, appointmentDate, receiptUrl, paymentReference } = bookingDetails;
-    if (!firstName || !lastName || !email || !therapistName || !appointmentDate) {
+    const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate, receiptUrl, paymentReference, packageName } = bookingDetails;
+    if (!firstName || !email || !appointmentDate) {
       return 'Missing required fields.';
     }
 
@@ -29,6 +29,7 @@ saveNewBooking: async (bookingDetails) => {
       appointmentDate,
       receiptUrl,
       paymentReference,
+      packageName,
     });
 
     await newBooking.save();

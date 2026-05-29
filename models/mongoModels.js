@@ -12,6 +12,7 @@ const bookingSchema = new mongoose.Schema({
   therapistName: String,
   receiptUrl: String,
   paymentReference: String,
+  packageName: String,
 });
 
 // Create a Mongoose model

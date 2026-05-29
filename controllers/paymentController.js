@@ -1,36 +1,55 @@
 require('dotenv').config();
 const axios = require('axios');
+const { paymentLogger, logError } = require('../utils/logger');
 
 const verifyPayment = async (req, res) => {
   const reference = req.params.reference;
 
-  try {
-    let secretKey = '';
+  paymentLogger.info('Verify payment request received', { reference });
 
-    if (process.env.ENVIRONMENT === 'production') {
-      secretKey = process.env.SECRET_KEY;
-    } else {
-      secretKey = 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
-    }
+  if (!reference) {
+    paymentLogger.warn('Payment reference missing', { route: 'verifyPayment' });
+    return res.status(400).json({ success: false, message: 'Payment reference is required' });
+  }
+
+  try {
+    const secretKey = process.env.ENVIRONMENT === 'production'
+      ? process.env.SECRET_KEY
+      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
 
     const paystackResponse = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
       {
         headers: {
-          Authorization: `Bearer ${secretKey}`, // Replace with your Paystack secret key
-        },
+          Authorization: `Bearer ${secretKey}`
+        }
       }
     );
 
-    // Handle the response from Paystack API
     const { data } = paystackResponse.data;
-    // You can process 'data' here and extract payment status or other details
 
-    console.log('Success, Reference:', data.status);
+    paymentLogger.info('Paystack verification response received', {
+      reference,
+      status: data?.status,
+      amount: data?.amount,
+      currency: data?.currency,
+      customerEmail: data?.customer?.email
+    });
+
     res.status(200).json(data);
   } catch (error) {
-    console.error('Error verifying payment:', error.response.data);
-    res.status(500).send('Error verifying payment');
+    const errorMessage = error.response?.data || error.message;
+    paymentLogger.error('Error verifying Paystack payment', {
+      reference,
+      error: errorMessage
+    });
+    logError(error, { operation: 'verifyPayment', reference });
+
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying payment',
+      error: process.env.NODE_ENV === 'production' ? undefined : errorMessage
+    });
   }
 };
 
