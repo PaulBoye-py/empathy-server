@@ -525,50 +525,50 @@ const processSquadPayment = async (req, res) => {
       });
     }
 
-    const squadMeta = squadData.meta || {};
+    // squadData is the full SDK verify response: { success, message, data: { ...transaction fields, meta: {...} } }
     const squadFullData = squadData.data || {};
+    const squadMeta = squadFullData.meta || {};
 
     const sessionData = {
-      SelectedTherapist: squadMeta.SelectedTherapist || metadata?.therapist_name,
+      SelectedTherapist: squadMeta.SelectedTherapist || metadata?.SelectedTherapist,
       location: squadMeta.location || metadata?.location,
-      meetingType: squadMeta.meetingType || metadata?.meeting_type,
-      calendlyLink: squadMeta.calendlyLink || metadata?.calendly_link,
-      discountCode: squadMeta.discountCode || metadata?.discount_code,
-      discountName: squadMeta.discountName || metadata?.discount_name,
-      customerFirstName: squadMeta.customerFirstName || metadata?.customer_first_name,
-      customerLastName: squadMeta.customerLastName || metadata?.customer_last_name,
+      meetingType: squadMeta.meetingType || metadata?.meetingType,
+      calendlyLink: squadMeta.calendlyLink || metadata?.calendlyLink,
+      discountCode: squadMeta.discountCode || metadata?.discountCode,
+      discountName: squadMeta.discountName || metadata?.discountName,
+      customerFirstName: squadMeta.customerFirstName || metadata?.customerFirstName,
+      customerLastName: squadMeta.customerLastName || metadata?.customerLastName,
       customerLocation: squadMeta.location || metadata?.location,
-      customerEmail: squadData.email || metadata?.customer_email,
-      customerName: `${squadMeta.customerFirstName || metadata?.customer_first_name || ''} ${squadMeta.customerLastName || metadata?.customer_last_name || ''}`.trim(),
-      amount: squadData.transaction_amount || metadata?.amount,
-      currency: squadData.transaction_currency_id || metadata?.currency,
+      customerEmail: squadFullData.email || metadata?.email,
+      customerName: `${squadMeta.customerFirstName || metadata?.customerFirstName || ''} ${squadMeta.customerLastName || metadata?.customerLastName || ''}`.trim(),
+      amount: squadFullData.transaction_amount || metadata?.amount,
+      currency: squadFullData.transaction_currency_id || metadata?.currency,
       transactionRef,
-      gatewayRef: squadFullData.gateway_transaction_ref || metadata?.gateway_transaction_ref,
+      gatewayRef: squadFullData.gateway_transaction_ref,
       merchantName: squadFullData.merchant_name,
-      paymentDate: squadFullData.created_at || metadata?.created_at
+      paymentDate: squadFullData.created_at
     };
 
     paymentLogger.info('Prepared Squad session data', sessionData);
 
     const transformedPaymentData = {
       reference: transactionRef,
-      amount: squadData.transaction_amount || metadata?.amount,
-      created_at: squadFullData.created_at || metadata?.created_at,
+      amount: sessionData.amount,
+      created_at: sessionData.paymentDate,
       status: squadFullData.transaction_status,
-      currency: metadata?.currency,
-      isCurrency: 'USD',
+      currency: sessionData.currency,
       metadata: {
-        customer_first_name: squadMeta.customerFirstName || metadata?.customer_first_name,
-        customer_last_name: squadMeta.customerLastName || metadata?.customer_last_name,
-        therapist_name: squadMeta.SelectedTherapist || metadata?.therapist_name,
-        location: squadMeta.location || metadata?.location,
-        meeting_type: squadMeta.meetingType || metadata?.meeting_type,
-        calendly_link: squadMeta.calendlyLink || metadata?.calendly_link,
-        discount_code: squadMeta.discountCode || metadata?.discount_code,
-        discount_name: squadMeta.discountName || metadata?.discount_name
+        customer_first_name: sessionData.customerFirstName,
+        customer_last_name: sessionData.customerLastName,
+        therapist_name: sessionData.SelectedTherapist,
+        location: sessionData.location,
+        meeting_type: sessionData.meetingType,
+        calendly_link: sessionData.calendlyLink,
+        discount_code: sessionData.discountCode,
+        discount_name: sessionData.discountName
       },
       customer: {
-        email: metadata?.customer_email,
+        email: sessionData.customerEmail,
         phone: 'N/A'
       }
     };
