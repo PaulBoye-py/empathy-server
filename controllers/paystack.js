@@ -1,6 +1,7 @@
 require('dotenv').config();
 const axios = require('axios');
-const { sendPaymentStatusNotification } = require('../utils/emailService');
+const { Squad } = require('@padar-labs/squad-ts');
+const { sendPaymentStatusNotification, sendCustomerFollowUpEmail } = require('../utils/emailService');
 const { reportError } = require('../middleware/errorReporting');
 const { paymentLogger, logError } = require('../utils/logger');
 
@@ -418,6 +419,23 @@ const getPaymentsSummary = async (hoursBack = 12) => {
       }
     };
 
+    // Send individual follow-up emails to each failed/abandoned customer
+    const followUpTargets = [
+      ...failedPayments.map(p => ({ payment: p, status: 'failed' })),
+      ...abandonedPayments.map(p => ({ payment: p, status: 'abandoned' })),
+    ];
+
+    for (const { payment, status: pStatus } of followUpTargets) {
+      const email = payment.customer?.email;
+      const firstName = payment.metadata?.customer_first_name || '';
+      const lastName = payment.metadata?.customer_last_name || '';
+      const customerName = `${firstName} ${lastName}`.trim() || 'Valued Client';
+      const reason = payment.gateway_response || 'Unknown';
+      sendCustomerFollowUpEmail(email, customerName, pStatus, { reason }).catch(err =>
+        paymentLogger.error('Failed to send customer follow-up', { email, error: err.message })
+      );
+    }
+
     return {
       success: true,
       summary,
@@ -478,6 +496,98 @@ const generatePaymentsSummaryReport = async (req, res) => {
 };
 
 
+const getSquadPaymentsSummary = async (hoursBack = 12) => {
+  try {
+    const squadClient = new Squad({
+      secretKey: process.env.SQUAD_SECRET_KEY,
+      environment: process.env.SQUAD_ENVIRONMENT === 'live' ? 'live' : 'sandbox',
+    });
+
+    const now = new Date();
+    const hoursAgo = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+
+    // Squad date params are YYYY-MM-DD strings; fetch a day window to be safe
+    const startDate = hoursAgo.toISOString().split('T')[0];
+    const endDate = now.toISOString().split('T')[0];
+
+    const response = await squadClient.payments.getAllTransactions({
+      perPage: 200,
+      start_date: startDate,
+      end_date: endDate,
+    });
+
+    const rows = response?.data?.rows || [];
+
+    const recentRows = rows.filter(t => {
+      const d = new Date(t.created_at);
+      return d >= hoursAgo && d <= now;
+    });
+
+    const successfulPayments = recentRows.filter(t => t.transaction_status?.toLowerCase() === 'success');
+    const failedPayments     = recentRows.filter(t => t.transaction_status?.toLowerCase() === 'failed');
+    const abandonedPayments  = recentRows.filter(t => t.transaction_status?.toLowerCase() === 'abandoned');
+
+    const toDetail = t => {
+      const meta = t.meta || {};
+      return {
+        reference: t.transaction_ref,
+        amount: t.amount,
+        customer: `${meta.customerFirstName || ''} ${meta.customerLastName || ''}`.trim() || 'Unknown',
+        email: t.email || 'N/A',
+        therapist: meta.SelectedTherapist || 'Unknown',
+        meetingType: meta.meetingType || 'N/A',
+        location: meta.location || 'N/A',
+        date: t.created_at,
+      };
+    };
+
+    // Send individual follow-up emails to failed/abandoned Squad customers
+    const followUpTargets = [
+      ...failedPayments.map(t => ({ t, status: 'failed' })),
+      ...abandonedPayments.map(t => ({ t, status: 'abandoned' })),
+    ];
+
+    for (const { t, status: pStatus } of followUpTargets) {
+      const meta = t.meta || {};
+      const email = t.email;
+      const customerName = `${meta.customerFirstName || ''} ${meta.customerLastName || ''}`.trim() || 'Valued Client';
+      sendCustomerFollowUpEmail(email, customerName, pStatus, {}).catch(err =>
+        paymentLogger.error('Failed to send Squad customer follow-up', { email, error: err.message })
+      );
+    }
+
+    const summary = {
+      timeRange: { from: hoursAgo.toISOString(), to: now.toISOString(), hoursBack },
+      totals: {
+        totalTransactions: recentRows.length,
+        successful: successfulPayments.length,
+        failed: failedPayments.length,
+        abandoned: abandonedPayments.length,
+      },
+      amounts: {
+        totalSuccessful: successfulPayments.reduce((s, t) => s + (t.amount || 0), 0),
+        totalFailed: failedPayments.reduce((s, t) => s + (t.amount || 0), 0),
+        totalAbandoned: abandonedPayments.reduce((s, t) => s + (t.amount || 0), 0),
+        currency: 'USD',
+      },
+      details: {
+        successful: successfulPayments.map(toDetail),
+        failed: failedPayments.map(toDetail),
+        abandoned: abandonedPayments.map(toDetail),
+      },
+    };
+
+    return { success: true, summary };
+  } catch (error) {
+    paymentLogger.error('Error getting Squad payments summary', {
+      hoursBack,
+      error: error.message,
+      stack: error.stack,
+    });
+    return { success: false, message: error.message, summary: null };
+  }
+};
+
 module.exports = {
   listPayments,
   verifyPayment,
@@ -485,5 +595,6 @@ module.exports = {
   handlePaystackWebhook,
   extractSessionDataFromMetadata,
   getPaymentsSummary,
+  getSquadPaymentsSummary,
   generatePaymentsSummaryReport,
 };

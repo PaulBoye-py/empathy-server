@@ -133,7 +133,7 @@
 
 // jobs/paymentSummaryJob.js - ENHANCED WITH DEBUGGING
 const cron = require('node-cron');
-const { getPaymentsSummary } = require('../controllers/paystack');
+const { getPaymentsSummary, getSquadPaymentsSummary } = require('../controllers/paystack');
 const { sendPaymentSummaryEmail } = require('../utils/emailService');
 const { reportError } = require('../middleware/errorReporting');
 const { cronLogger } = require('../utils/logger');
@@ -159,37 +159,47 @@ class PaymentSummaryJob {
     });
     
     try {
-      // Get payment summary for last 12 hours
-      const result = await getPaymentsSummary(12);
-      
-      if (result.success) {
-        const { summary } = result;
-        
-        cronLogger.info('📊 Payment summary data retrieved', {
+      // Fetch both Paystack (NGN) and Squad (USD) summaries in parallel
+      const [paystackResult, squadResult] = await Promise.all([
+        getPaymentsSummary(12),
+        getSquadPaymentsSummary(12),
+      ]);
+
+      if (!paystackResult.success) {
+        throw new Error(`Failed to get Paystack summary: ${paystackResult.message}`);
+      }
+
+      const { summary } = paystackResult;
+      const squadSummary = squadResult.success ? squadResult.summary : null;
+
+      cronLogger.info('📊 Payment summary data retrieved', {
+        paystack: {
           totalTransactions: summary.totals.totalTransactions,
           successful: summary.totals.successful,
           failed: summary.totals.failed,
           abandoned: summary.totals.abandoned,
-          revenue: `₦${(summary.amounts.totalSuccessful / 100).toLocaleString()}`
-        });
-        
-        // Send email summary
-        await sendPaymentSummaryEmail(summary);
-        
-        const endTime = new Date();
-        const duration = endTime - startTime;
-        this.lastRun = endTime.toISOString();
-        
-        cronLogger.info('✅ Payment summary cron job completed successfully', {
-          duration: `${duration}ms`,
-          transactions: summary.totals.totalTransactions,
           revenue: `₦${(summary.amounts.totalSuccessful / 100).toLocaleString()}`,
-          emailSent: true
-        });
-        
-      } else {
-        throw new Error(`Failed to get payment summary: ${result.message}`);
-      }
+        },
+        squad: squadSummary ? {
+          totalTransactions: squadSummary.totals.totalTransactions,
+          successful: squadSummary.totals.successful,
+          failed: squadSummary.totals.failed,
+          revenue: `$${(squadSummary.amounts.totalSuccessful / 100).toFixed(2)}`,
+        } : 'unavailable',
+      });
+
+      await sendPaymentSummaryEmail(summary, squadSummary);
+
+      const endTime = new Date();
+      const duration = endTime - startTime;
+      this.lastRun = endTime.toISOString();
+
+      cronLogger.info('✅ Payment summary cron job completed successfully', {
+        duration: `${duration}ms`,
+        paystackTransactions: summary.totals.totalTransactions,
+        squadTransactions: squadSummary?.totals.totalTransactions ?? 0,
+        emailSent: true,
+      });
       
     } catch (error) {
       this.failureCount++;
