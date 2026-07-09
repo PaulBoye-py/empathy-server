@@ -41,8 +41,11 @@ const paystackRoutes = require('./routes/paystack');
 const { errorReportingMiddleware } = require('./middleware/errorReporting');
 const { default: mongoose } = require('mongoose');
 
-// SQUAD 
+// SQUAD
 const squadRoute = require('./routes/squadRoute');
+
+// APP CONFIG
+const appSettingsRoute = require('./routes/appSettingsRoute');
 
 // CRON
 const { schedulePaymentSummaryJob } = require('./jobs/paymentSummaryJob');
@@ -153,6 +156,8 @@ app.use('/api/v1/payment', flutterwaveRoute);
 
 // Health check routes (IMPORTANT: Must be available for keep-alive)
 app.use('/api/health', healthRoutes);
+
+app.use('/api/v1/config', appSettingsRoute(therapistConnection, usersConnection))
 
 app.use('/api/v1/auth', authRoute(therapistConnection))
 app.use('/api/v1/users', newUserRoute(therapistConnection))
