@@ -27,8 +27,9 @@ const therapistSchema = new mongoose.Schema({
   discount_virtual_dollar: Number,
   discount_virtual_pounds: Number,
   description: String,  // Added new field
-  isActive: Boolean, //
-  email: String, //
+  isActive: Boolean,
+  email: String,
+  accept_nigerian_clients: { type: Boolean, default: true },
   packages: {
     type: [String],
     enum: ["soberup", "ololufe"],

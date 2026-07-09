@@ -20,11 +20,11 @@ const run = async () => {
   const AppSettings = createAppSettings(conn);
 
   const result = await AppSettings.findOneAndUpdate(
-    { key: 'local_bookings_enabled' },
+    { key: 'nigerian_bookings_enabled' },
     {
-      key: 'local_bookings_enabled',
+      key: 'nigerian_bookings_enabled',
       value: false,
-      description: 'Controls NGN/Paystack booking availability on the website',
+      description: 'Global toggle — when false, no Nigerian client can book any therapist',
       updatedBy: 'seed',
     },
     { upsert: true, new: true }
