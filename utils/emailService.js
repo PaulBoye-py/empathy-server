@@ -5,9 +5,10 @@ const nodemailer = require('nodemailer');
 const SUPPORT_EMAILS = process.env.NODE_ENV === 'production'
   ? [
       'estherapyhub@gmail.com',
-      'asereopeyemimichael@gmail.com',
+      // 'asereopeyemimichael@gmail.com',
+      'admin@padarlabs.com',
       'paul.adeboye@yahoo.com',
-      'timiasha7@gmail.com',
+      // 'timiasha7@gmail.com',
       'kunle.ogunsola@gmail.com',
       'drkaf@empathyspaceng.org',
       'info@empathyspaceng.org',
@@ -16,7 +17,8 @@ const SUPPORT_EMAILS = process.env.NODE_ENV === 'production'
 
 const ERROR_NOTIFICATION_EMAILS = [
   'paul.adeboye@yahoo.com',
-  'timiasha7@gmail.com',
+   'admin@padarlabs.com',
+  // 'timiasha7@gmail.com',
 ];
 
 const BRAND = {
