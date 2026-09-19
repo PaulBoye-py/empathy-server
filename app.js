@@ -65,6 +65,17 @@ const healthRoutes = require('./routes/health');
 // Request logging middleware (add early)
 app.use(requestLogger);
 
+// Reject requests that don't arrive via our custom domain. AWS App Runner's
+// default *.awsapprunner.com URL stays publicly reachable even after a custom
+// domain is attached, and it's a magnet for scanners that hit it directly.
+const ALLOWED_HOSTS = ['api.myempathyspace.com'];
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production' && !ALLOWED_HOSTS.includes(req.hostname)) {
+    return res.status(403).end();
+  }
+  next();
+});
+
 const allowedOrigins = [
     process.env.FRONTENDURL,
     'https://www.myempathyspace.com',
@@ -87,9 +98,11 @@ const corsOptions ={
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
-        } else (
-            callback(new Error('Not allowed by CORS'))
-        )
+        } else {
+            const err = new Error('Not allowed by CORS');
+            err.status = 403;
+            callback(err);
+        }
     },
     credentials:true,            //access-control-allow-credentials:true
     optionSuccessStatus:200,

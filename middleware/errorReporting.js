@@ -3,13 +3,12 @@ const { sendErrorNotification } = require('../utils/emailService');
 
 // Middleware to catch and report errors
 const errorReportingMiddleware = (err, req, res, next) => {
-  // Skip reporting CORS errors from HTTP origins (likely bots/health checks)
-  const isHttpCorsError = err.message === 'Not allowed by CORS' && 
-    req.headers.origin && 
-    req.headers.origin.startsWith('http://');
-  
-  if (isHttpCorsError) {
-    console.log('Skipping CORS error report for HTTP origin:', req.headers.origin);
+  // Skip reporting CORS rejections entirely — these are disallowed origins
+  // (bots, scanners, misconfigured clients), never something to email about.
+  const isCorsError = err.message === 'Not allowed by CORS';
+
+  if (isCorsError) {
+    console.log('Skipping CORS error report for origin:', req.headers.origin);
   } else {
     // Log error to console
     console.error('Error caught by middleware:', err);

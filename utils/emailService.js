@@ -127,10 +127,37 @@ const formatAmount = (amount, currency) => {
   return `NGN ${(amount / 100).toLocaleString()}`;
 };
 
+// ─── email rate limiting ──────────────────────────────────────────────────────
+
+// A tight retry/poll loop (or a bot) can trigger these dozens of times within
+// seconds; without a cap, each call fires a real email, and enough of them in
+// a burst gets our Zoho account flagged and blocked (which then breaks
+// legitimate mail too). Each guard tracks its own rolling window.
+const createEmailRateLimiter = (windowMs, maxPerWindow) => {
+  let timestamps = [];
+  return () => {
+    const now = Date.now();
+    timestamps = timestamps.filter(ts => now - ts < windowMs);
+    if (timestamps.length >= maxPerWindow) return false;
+    timestamps.push(now);
+    return true;
+  };
+};
+
+const canSendErrorNotification = createEmailRateLimiter(5 * 60 * 1000, 5);
+// Higher ceiling: this one fires on every real payment, so it needs headroom
+// for genuine traffic — it's here to catch a runaway loop, not normal volume.
+const canSendPaymentStatusNotification = createEmailRateLimiter(5 * 60 * 1000, 20);
+
 // ─── sendErrorNotification ────────────────────────────────────────────────────
 
 const sendErrorNotification = async (errorType, errorDetails, clientData = null) => {
   try {
+    if (!canSendErrorNotification()) {
+      console.warn('Suppressing error notification email (rate limit reached)', { errorType });
+      return;
+    }
+
     const subject = `System Error — ${errorType} | EmpathySpace`;
 
     const body = `
@@ -174,6 +201,11 @@ const sendErrorNotification = async (errorType, errorDetails, clientData = null)
 
 const sendPaymentStatusNotification = async (paymentData, status, clientData = null) => {
   try {
+    if (!canSendPaymentStatusNotification()) {
+      console.warn('Suppressing payment status notification email (rate limit reached)', { status, reference: paymentData.reference });
+      return;
+    }
+
     const firstName = paymentData.metadata?.customer_first_name || '';
     const lastName = paymentData.metadata?.customer_last_name || '';
     const name = `${firstName} ${lastName}`.trim() || 'Unknown';

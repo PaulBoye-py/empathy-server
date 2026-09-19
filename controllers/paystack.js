@@ -1,6 +1,6 @@
 require('dotenv').config();
 const axios = require('axios');
-const { Squad } = require('@padar-labs/squad-ts');
+const { Squad, SquadError } = require('@padar-labs/squad-ts');
 const { sendPaymentStatusNotification, sendCustomerFollowUpEmail } = require('../utils/emailService');
 const { reportError } = require('../middleware/errorReporting');
 const { paymentLogger, logError } = require('../utils/logger');
@@ -579,11 +579,40 @@ const getSquadPaymentsSummary = async (hoursBack = 12) => {
 
     return { success: true, summary };
   } catch (error) {
+    // Squad's /transaction endpoint returns a 404 "no transaction found"
+    // instead of 200 + an empty list when nothing matches the window — that's
+    // not a failure, just zero Squad transactions in this period.
+    if (error instanceof SquadError && error.statusCode === 404) {
+      const now = new Date();
+      const hoursAgo = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+      return {
+        success: true,
+        summary: {
+          timeRange: { from: hoursAgo.toISOString(), to: now.toISOString(), hoursBack },
+          totals: { totalTransactions: 0, successful: 0, failed: 0, abandoned: 0 },
+          amounts: { totalSuccessful: 0, totalFailed: 0, totalAbandoned: 0, currency: 'USD' },
+          details: { successful: [], failed: [], abandoned: [] },
+        },
+      };
+    }
+
     paymentLogger.error('Error getting Squad payments summary', {
       hoursBack,
       error: error.message,
       stack: error.stack,
     });
+
+    // Unlike the empty-result case above, this is a genuine failure (auth,
+    // network, etc.) — worth an actual notification since it otherwise fails silently.
+    reportError('Squad Payments Summary Error', error, {
+      operation: 'getSquadPaymentsSummary',
+      hoursBack,
+    }).catch(reportingError => {
+      paymentLogger.error('Failed to report Squad payments summary error', {
+        reportingError: reportingError.message,
+      });
+    });
+
     return { success: false, message: error.message, summary: null };
   }
 };
