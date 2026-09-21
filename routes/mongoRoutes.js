@@ -41,7 +41,7 @@ router.post('/booking', async (req, res) => {
       packageName,
     };
     const result = await mongoController.saveNewBooking(bookingDetails);
-    res.json(result);
+    res.status(result.status).json(result);
   } catch (error) {
     console.error('Error saving booking:', error);
     res.status(500).json({ error: 'Internal Server Error' });

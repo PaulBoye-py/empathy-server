@@ -13,44 +13,30 @@ const Booking = require('../models/mongoModels')
 const mongoController = {
 // Insert data
 saveNewBooking: async (bookingDetails) => {
-  try {
-    const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate, receiptUrl, paymentReference, packageName } = bookingDetails;
-    if (!firstName || !email || !appointmentDate) {
-      return 'Missing required fields.';
-    }
-
-    const newBooking = new Booking({
-      firstName,
-      lastName,
-      email,
-      therapistName,
-      meetingType,
-      location,
-      appointmentDate,
-      receiptUrl,
-      paymentReference,
-      packageName,
-    });
-
-    await newBooking.save();
-
-    // await transporter.sendMail({
-    //   from: 'estherapyhub@gmail.com', // Replace with your email address
-    //   to: 'estherapyhub@gmail.com',
-    //   subject: 'New Booking Created',
-    //   text: `Hello, a new booking has been created successfully! \n
-    //         Here are the booking details: \n
-    //         Name of Client: ${firstName} + ' ' + ${lastName} \n
-    //         Email address of Client: ${email} \n
-    //         Name of Therapsit: ${therapistName} \n
-    //         Date of Appointment Booking: ${appointmentDate}`
-    //         , 
-    // });
-
-    return 'New booking created for the patient.';
-  } catch (error) {
-    return `Error: ${error.message}`;
+  const { firstName, lastName, email, meetingType, location, therapistName, appointmentDate, receiptUrl, paymentReference, packageName } = bookingDetails;
+  if (!firstName || !email || !appointmentDate) {
+    // Previously returned this as a 200 OK string, which the client treated
+    // as success (showed "Ordered Confirmed" and redirected) even though
+    // nothing was saved. Callers must check `success` and use `status`.
+    return { success: false, status: 400, message: 'Missing required fields.' };
   }
+
+  const newBooking = new Booking({
+    firstName,
+    lastName,
+    email,
+    therapistName,
+    meetingType,
+    location,
+    appointmentDate,
+    receiptUrl,
+    paymentReference,
+    packageName,
+  });
+
+  await newBooking.save();
+
+  return { success: true, status: 200, message: 'New booking created for the patient.' };
 },
 
 getBookings: async (filters) => {
