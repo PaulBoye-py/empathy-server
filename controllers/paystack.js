@@ -496,6 +496,28 @@ const generatePaymentsSummaryReport = async (req, res) => {
 };
 
 
+// Squad's transaction-listing endpoint isn't in their current public docs
+// (only their old, deprecated GitBook docs mention it) and publishes no rate
+// limit numbers anywhere — but it 429s intermittently even at our low call
+// volume (once per 12h). A single delayed retry smooths over that transient
+// throttle without hammering Squad further; if it still fails, the caller's
+// existing error handling takes over.
+const getAllTransactionsWithRetry = async (squadClient, params, retries = 1, delayMs = 60000) => {
+  try {
+    return await squadClient.payments.getAllTransactions(params);
+  } catch (error) {
+    if (error instanceof SquadError && error.statusCode === 429 && retries > 0) {
+      paymentLogger.warn('Squad rate-limited getAllTransactions — retrying after delay', {
+        delayMs,
+        retriesLeft: retries,
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return getAllTransactionsWithRetry(squadClient, params, retries - 1, delayMs);
+    }
+    throw error;
+  }
+};
+
 const getSquadPaymentsSummary = async (hoursBack = 12) => {
   try {
     const squadClient = new Squad({
@@ -510,7 +532,7 @@ const getSquadPaymentsSummary = async (hoursBack = 12) => {
     const startDate = hoursAgo.toISOString().split('T')[0];
     const endDate = now.toISOString().split('T')[0];
 
-    const response = await squadClient.payments.getAllTransactions({
+    const response = await getAllTransactionsWithRetry(squadClient, {
       perPage: 200,
       start_date: startDate,
       end_date: endDate,
