@@ -59,6 +59,7 @@ module.exports = (connection) => {
       discount_virtual_pounds,
       description,
       isActive,
+      waiting_time,
     } = request.body
 
     const therapist = new Therapist({
@@ -89,6 +90,7 @@ module.exports = (connection) => {
       discount_virtual_pounds,
       description,
       isActive,
+      waiting_time,
     })
 
     try {
