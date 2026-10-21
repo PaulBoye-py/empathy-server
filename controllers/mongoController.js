@@ -39,6 +39,28 @@ saveNewBooking: async (bookingDetails) => {
   return { success: true, status: 200, message: 'New booking created for the patient.' };
 },
 
+// The booking is created right after payment, before the receipt PDF exists,
+// so the receipt link is attached afterwards. Only fills an empty receiptUrl
+// (never overwrites) and only accepts an S3-hosted PDF, since this is called
+// from the public checkout without auth.
+attachReceipt: async ({ paymentReference, receiptUrl }) => {
+  if (typeof paymentReference !== 'string' || !paymentReference ||
+      typeof receiptUrl !== 'string' || !/^https:\/\/[a-z0-9.-]+\.s3\.[a-z0-9-]+\.amazonaws\.com\/.+\.pdf$/i.test(receiptUrl)) {
+    return { success: false, status: 400, message: 'Invalid paymentReference or receiptUrl.' };
+  }
+
+  const booking = await Booking.findOneAndUpdate(
+    { paymentReference, receiptUrl: { $in: [null, ''] } },
+    { receiptUrl },
+    { new: true }
+  );
+
+  if (!booking) {
+    return { success: false, status: 404, message: 'No booking awaiting a receipt for this reference.' };
+  }
+  return { success: true, status: 200, message: 'Receipt attached to booking.' };
+},
+
 getBookings: async (filters) => {
   try {
     const query = {};
