@@ -48,6 +48,17 @@ router.post('/booking', async (req, res) => {
   }
 });
 
+router.patch('/booking/receipt', async (req, res) => {
+  try {
+    const { paymentReference, receiptUrl } = req.body;
+    const result = await mongoController.attachReceipt({ paymentReference, receiptUrl });
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error attaching receipt to booking:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 router.get('/bookings', async (req, res) => {
   const allowedOrigins = [
     'https://www.myempathyspace.com',

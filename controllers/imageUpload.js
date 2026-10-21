@@ -18,14 +18,19 @@ const s3 = new S3Client({
 // Configure multer with memory storage
 const upload = multer({
     storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => cb(null, /^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)),
 });
 
 s3Router.post('/upload', upload.single('image'), async (req, res) => {
     try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'An image file (jpeg, png, webp or gif) is required' });
+        }
         const uploadParams = {
             Bucket: 'emapathy-therapists',
             // Key: Date.now().toString() + req.file.originalname,
-            Key: `empathy-therapists/${Date.now().toString()}-${req.file.originalname}`,
+            Key: `empathy-therapists/${Date.now().toString()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
             Body: req.file.buffer,
             ContentType: req.file.mimetype,
         };
@@ -45,8 +50,7 @@ s3Router.post('/upload', upload.single('image'), async (req, res) => {
         res.json({ imageUrl });
     } catch (error) {
         console.error('Error uploading image:', error);
-        res.status(500).send('Error uploading image', error);
-        throw error;
+        res.status(500).json({ error: 'Error uploading image' });
     }
 });
 
