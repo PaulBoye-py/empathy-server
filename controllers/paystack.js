@@ -13,7 +13,7 @@ const listPayments = async (req, res) => {
     
     const secretKey = process.env.ENVIRONMENT === 'production'
       ? process.env.SECRET_KEY
-      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
+      : process.env.PAYSTACK_TEST_SECRET_KEY;
 
     const response = await axios.get('https://api.paystack.co/transaction', {
       headers: {
@@ -60,7 +60,7 @@ const verifyPayment = async (req, res) => {
 
     const secretKey = process.env.ENVIRONMENT === 'production'
       ? process.env.SECRET_KEY
-      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
+      : process.env.PAYSTACK_TEST_SECRET_KEY;
 
     const response = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
@@ -240,7 +240,7 @@ const monitorPaymentStatuses = async (req, res) => {
   try {
     const secretKey = process.env.ENVIRONMENT === 'production'
       ? process.env.SECRET_KEY
-      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
+      : process.env.PAYSTACK_TEST_SECRET_KEY;
 
     // Get all recent transactions first, then filter
     // Paystack API might not handle multiple status filters well
@@ -316,7 +316,7 @@ const getPaymentsSummary = async (hoursBack = 12) => {
   try {
     const secretKey = process.env.ENVIRONMENT === 'production'
       ? process.env.SECRET_KEY
-      : 'sk_test_29c86c6683f85c4badd6f0459fe30b766f798903';
+      : process.env.PAYSTACK_TEST_SECRET_KEY;
 
     // Calculate time range (last 12 hours)
     const now = new Date();

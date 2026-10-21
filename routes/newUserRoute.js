@@ -8,7 +8,6 @@ const newUserRoute = (connection) => {
   router.get('/current-user', userExtractor, (req, res) => {
     if (req.user) {
       res.send(req.user);
-      console.log(`user requested: ${req.user}`);
     } else {
       res.status(404).send({ error: 'User not found' });
     }

@@ -6,13 +6,10 @@ module.exports = (connection) => {
 
     const tokenExtractor = (request, response, next) => {
         const authorization = request.get('Authorization');
-        console.log('authorization', authorization)
         if (authorization && authorization.startsWith('Bearer ')) {
             request.token = authorization.replace('Bearer ', '');
-            console.log('Extracted token:', request.token);
         } else {
             request.token = null;
-            console.log('No token found');
         }
         next();
     };
@@ -23,15 +20,15 @@ module.exports = (connection) => {
         if (token) {
             try {
                 const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-                console.log('Decoded token:', decodedToken);
-                if (decodedToken.id) {
-                    request.user = await User.findById(decodedToken.id);
-                    if (!request.user) {
-                        return response.status(404).json({ error: 'User not found' });
-                    }
+                if (!decodedToken.id) {
+                    return response.status(401).json({ error: 'token invalid' });
+                }
+                request.user = await User.findById(decodedToken.id);
+                if (!request.user) {
+                    return response.status(404).json({ error: 'User not found' });
                 }
             } catch (error) {
-                console.error('Token verification error:', error);
+                console.error('Token verification error:', error.message);
                 return response.status(401).json({ error: 'token invalid' });
             }
         } else {

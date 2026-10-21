@@ -149,6 +149,26 @@ app.use(express.json());
 
 app.use(cors(corsOptions));
 
+// Admin-only endpoints. These routers are shared with public endpoints the
+// website needs (booking create, payment verify, promo lookup by name), so
+// the guards live here in one place rather than in each router.
+const { userExtractor } = middleware(therapistConnection)
+const adminOnly = [userExtractor, (req, res, next) =>
+  req.user ? next() : res.status(401).json({ error: 'token missing or invalid' })]
+
+app.post('/api/v1/auth/register', adminOnly)
+app.post('/api/v1/users/upload', adminOnly)
+app.get('/api/v1/booking/bookings', adminOnly)
+app.get('/api/v1/promo/promo_codes', adminOnly)
+app.get('/api/v1/promo/promo_codes/by_status/:status', adminOnly)
+app.get('/api/v1/promo/promo_codes/:id', adminOnly)
+app.get('/api/v1/payment/listPayment', adminOnly)
+app.post('/api/v1/payment/monitor', adminOnly)
+app.use('/api/v1/payment/summary', adminOnly)
+app.use('/api/v1/payment/cron', adminOnly)
+app.post('/api/v1/payment/squad/summary/trigger', adminOnly)
+app.post('/api/health/keep-alive/*', adminOnly)
+
 // app.use('/api/v1/professionals', sqlRoutes);
 
 app.use('/api/v1/professionals', therapistsController(therapistConnection))
