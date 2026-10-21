@@ -60,6 +60,8 @@ module.exports = (connection) => {
       description,
       isActive,
       waiting_time,
+      waiting_time_unit,
+      is_available,
     } = request.body
 
     const therapist = new Therapist({
@@ -91,6 +93,8 @@ module.exports = (connection) => {
       description,
       isActive,
       waiting_time,
+      waiting_time_unit,
+      is_available,
     })
 
     try {

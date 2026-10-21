@@ -30,6 +30,8 @@ const therapistSchema = new mongoose.Schema({
   isActive: Boolean,
   email: String,
   waiting_time: { type: String, default: "24 - 48" },
+  waiting_time_unit: { type: String, enum: ["hours", "days", "weeks", "months"], default: "hours" },
+  is_available: { type: Boolean, default: true },
   accept_nigerian_clients: { type: Boolean, default: true },
   packages: {
     type: [String],
